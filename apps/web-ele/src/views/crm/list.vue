@@ -1,0 +1,670 @@
+<script lang="ts" setup>
+import type { CrmModule } from '#/api';
+
+import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
+
+import { Page } from '@vben/common-ui';
+
+import {
+  ElButton,
+  ElCard,
+  ElCascader,
+  ElDatePicker,
+  ElDialog,
+  ElForm,
+  ElFormItem,
+  ElInput,
+  ElMessage,
+  ElMessageBox,
+  ElOption,
+  ElPagination,
+  ElSelect,
+  ElSwitch,
+  ElTable,
+  ElTableColumn,
+  ElTag,
+  ElUpload,
+} from 'element-plus';
+
+import {
+  createApi,
+  deleteApi,
+  detailApi,
+  dictsApi,
+  importCustomersApi,
+  listApi,
+  updateApi,
+} from '#/api';
+
+const route = useRoute();
+const moduleName = computed(() => route.meta.crmModule as CrmModule);
+
+const statusOptions = [
+  { label: '启用', value: 1 },
+  { label: '禁用', value: 2 },
+];
+const customerStatusOptions = [
+  { label: '待分配', value: 1 },
+  { label: '跟进中', value: 2 },
+  { label: '已成交', value: 3 },
+  { label: '无效', value: 4 },
+];
+const genderOptions = [
+  { label: '未知', value: 0 },
+  { label: '男', value: 1 },
+  { label: '女', value: 2 },
+];
+const configs: Record<CrmModule, any> = {
+  customers: {
+    title: '客户管理',
+    fields: [
+      { field: 'customerName', label: '客户姓名', required: true },
+      { field: 'phone', label: '联系电话', required: true },
+      { field: 'schoolId', label: '所属学校', required: true, type: 'school' },
+      { field: 'gradeCode', label: '年级', required: true, type: 'grade' },
+      { field: 'assignedTeamId', label: '分配团队', type: 'team' },
+      { field: 'assignedEmployeeId', label: '分配员工', type: 'employee' },
+      {
+        field: 'status',
+        label: '状态',
+        options: customerStatusOptions,
+        type: 'select',
+      },
+      { field: 'dealAt', label: '成交时间', type: 'datetime' },
+      { field: 'remark', label: '备注', type: 'textarea' },
+    ],
+    filters: ['status', 'schoolId', 'gradeCode'],
+    table: [
+      { field: 'customerName', label: '客户姓名' },
+      { field: 'phone', label: '联系电话' },
+      { field: 'schoolId', label: '学校ID' },
+      { field: 'gradeCode', label: '年级' },
+      { field: 'assignedCount', label: '分配次数' },
+      { field: 'status', label: '状态', type: 'customerStatus' },
+      { field: 'updatedAt', label: '更新时间', type: 'date' },
+    ],
+  },
+  employees: {
+    title: '员工管理',
+    fields: [
+      { field: 'username', label: '登录用户名', required: true },
+      { field: 'password', label: '登录密码', required: true, type: 'password' },
+      { field: 'realName', label: '员工姓名', required: true },
+      { field: 'phone', label: '手机号', required: true },
+      { field: 'gender', label: '性别', options: genderOptions, type: 'select' },
+      { field: 'isAdmin', label: '管理员', type: 'switch' },
+      { field: 'status', label: '状态', options: statusOptions, type: 'select' },
+      { field: 'avatarUrl', label: '头像URL' },
+    ],
+    filters: ['status', 'teamId'],
+    table: [
+      { field: 'username', label: '用户名' },
+      { field: 'realName', label: '姓名' },
+      { field: 'phone', label: '手机号' },
+      { field: 'isAdmin', label: '管理员', type: 'bool' },
+      { field: 'status', label: '状态', type: 'status' },
+      { field: 'lastLoginAt', label: '最后登录', type: 'date' },
+    ],
+  },
+  schools: {
+    title: '学校管理',
+    fields: [
+      { field: 'schoolName', label: '学校名称', required: true },
+      {
+        field: 'typeCodes',
+        label: '学校类型',
+        multiple: true,
+        type: 'schoolType',
+      },
+      { field: 'gradeCodes', label: '可用年级', multiple: true, type: 'grade' },
+      { field: 'status', label: '状态', options: statusOptions, type: 'select' },
+    ],
+    filters: ['status'],
+    table: [
+      { field: 'schoolName', label: '学校名称' },
+      { field: 'customerCount', label: '客户数' },
+      { field: 'status', label: '状态', type: 'status' },
+      { field: 'updatedAt', label: '更新时间', type: 'date' },
+    ],
+  },
+  teams: {
+    title: '团队管理',
+    fields: [
+      { field: 'teamName', label: '团队名称', required: true },
+      { field: 'memberIds', label: '团队成员', multiple: true, type: 'employee' },
+      { field: 'leaderIds', label: '负责人', multiple: true, type: 'employee' },
+      { field: 'scopes', label: '客户权限', type: 'scopes' },
+      { field: 'status', label: '状态', options: statusOptions, type: 'select' },
+    ],
+    filters: ['status'],
+    table: [
+      { field: 'teamName', label: '团队名称' },
+      { field: 'memberCount', label: '成员数量' },
+      { field: 'leaderCount', label: '负责人数' },
+      { field: 'scopeCount', label: '权限数量' },
+      { field: 'status', label: '状态', type: 'status' },
+      { field: 'updatedAt', label: '更新时间', type: 'date' },
+    ],
+  },
+};
+
+const config = computed(() => configs[moduleName.value]);
+const dialogVisible = ref(false);
+const importVisible = ref(false);
+const editingId = ref<number>();
+const loading = ref(false);
+const rows = ref<Record<string, any>[]>([]);
+const total = ref(0);
+const fileList = ref<any[]>([]);
+const formRef = ref();
+const teamScopesTouched = ref(false);
+const form = reactive<Record<string, any>>({});
+const importForm = reactive({ gradeCode: undefined, schoolId: undefined });
+const query = reactive<Record<string, any>>({
+  keyword: '',
+  page: 1,
+  pageSize: 20,
+});
+const dicts = reactive({
+  employees: [] as Record<string, any>[],
+  grades: [] as Record<string, any>[],
+  schools: [] as Record<string, any>[],
+  schoolTypes: [] as Record<string, any>[],
+  teams: [] as Record<string, any>[],
+});
+
+function labelOf(options: readonly { label: string; value: number }[], value: any) {
+  return options.find((item) => item.value === Number(value))?.label || value || '-';
+}
+
+function fmt(value: any, type?: string) {
+  if (value === undefined || value === null || value === '') return '-';
+  if (type === 'status') return labelOf(statusOptions, value);
+  if (type === 'customerStatus') return labelOf(customerStatusOptions, value);
+  if (type === 'bool') return value ? '是' : '否';
+  if (type === 'date') return new Date(value).toLocaleString();
+  return value;
+}
+
+function selectOptions(field: any) {
+  if (field.options) return field.options;
+  if (field.type === 'grade') {
+    return dicts.grades.map((item) => ({
+      label: item.gradeName,
+      value: item.gradeCode,
+    }));
+  }
+  if (field.type === 'schoolType') {
+    return dicts.schoolTypes.map((item) => ({
+      label: item.typeName,
+      value: item.typeCode,
+    }));
+  }
+  if (field.type === 'school') {
+    return dicts.schools.map((item) => ({
+      label: item.schoolName,
+      value: item.id,
+    }));
+  }
+  if (field.type === 'team') {
+    return dicts.teams.map((item) => ({
+      label: item.teamName,
+      value: item.id,
+    }));
+  }
+  if (field.type === 'employee') {
+    return dicts.employees.map((item) => ({
+      label: item.realName,
+      value: item.id,
+    }));
+  }
+  return [];
+}
+
+const scopeCascaderProps = { multiple: true };
+
+const schoolScopeOptions = computed(() =>
+  dicts.schools.map((school) => {
+    const gradeCodes =
+      Array.isArray(school.gradeCodes) && school.gradeCodes.length > 0
+        ? school.gradeCodes
+        : dicts.grades.map((grade) => grade.gradeCode);
+
+    return {
+      children: dicts.grades
+        .filter((grade) => gradeCodes.includes(grade.gradeCode))
+        .map((grade) => ({
+          label: grade.gradeName,
+          value: grade.gradeCode,
+        })),
+      label: school.schoolName,
+      value: school.id,
+    };
+  }),
+);
+
+const scopeValue = computed({
+  get() {
+    return (form.scopes || [])
+      .filter((item: Record<string, any>) => item.schoolId && item.gradeCode)
+      .map((item: Record<string, any>) => [item.schoolId, item.gradeCode]);
+  },
+  set(value: number[][] = []) {
+    teamScopesTouched.value = true;
+    form.scopes = value.map(([schoolId, gradeCode]) => ({
+      gradeCode,
+      schoolId,
+    }));
+  },
+});
+
+async function loadAuxData() {
+  const [dictRes, schools, teams, employees] = await Promise.all([
+    dictsApi(),
+    listApi('schools', { page: 1, pageSize: 100 }),
+    listApi('teams', { page: 1, pageSize: 100 }),
+    listApi('employees', { page: 1, pageSize: 100 }),
+  ]);
+  dicts.grades = dictRes.grades || [];
+  dicts.schoolTypes = dictRes.schoolTypes || [];
+  dicts.schools = schools.items || [];
+  dicts.teams = teams.items || [];
+  dicts.employees = employees.items || [];
+}
+
+async function loadData() {
+  loading.value = true;
+  try {
+    const result = await listApi(moduleName.value, query);
+    rows.value = result.items || [];
+    total.value = result.total || 0;
+  } catch (error) {
+    if (handleCustomerScopeForbidden(error)) {
+      rows.value = [];
+      total.value = 0;
+      return;
+    }
+    throw error;
+  } finally {
+    loading.value = false;
+  }
+}
+
+function customerScopeForbidden(error: any) {
+  const message =
+    error?.error ??
+    error?.message ??
+    error?.response?.data?.error ??
+    error?.response?.data?.message;
+  return message === '无权访问该学校年级客户';
+}
+
+function handleCustomerScopeForbidden(error: any) {
+  if (moduleName.value !== 'customers' || !customerScopeForbidden(error)) {
+    return false;
+  }
+  ElMessage.warning('暂无该学校年级客户权限');
+  return true;
+}
+
+async function resetForm(row?: Record<string, any>) {
+  editingId.value = row?.id;
+  teamScopesTouched.value = false;
+  Object.keys(form).forEach((key) => delete form[key]);
+  const data =
+    moduleName.value === 'teams' && row?.id
+      ? await detailApi('teams', row.id)
+      : row;
+  for (const field of config.value.fields) {
+    form[field.field] =
+      data?.[field.field] ??
+      (field.multiple || field.type === 'scopes'
+        ? []
+        : field.type === 'switch'
+          ? false
+          : undefined);
+  }
+  if (moduleName.value === 'employees' && row) {
+    form.password = undefined;
+  }
+}
+
+async function openDialog(row?: Record<string, any>) {
+  await resetForm(row);
+  dialogVisible.value = true;
+}
+
+function payload() {
+  const data = Object.fromEntries(
+    Object.entries(form).filter(([, value]) => value !== '' && value !== undefined),
+  );
+  if (moduleName.value === 'employees' && editingId.value && !data.password) {
+    delete data.password;
+  }
+  if (
+    moduleName.value === 'teams' &&
+    editingId.value &&
+    !teamScopesTouched.value
+  ) {
+    delete data.scopes;
+  }
+  return data;
+}
+
+async function save() {
+  await formRef.value?.validate();
+  try {
+    if (editingId.value) {
+      await updateApi(moduleName.value, editingId.value, payload());
+    } else {
+      await createApi(moduleName.value, payload());
+    }
+  } catch (error) {
+    if (handleCustomerScopeForbidden(error)) return;
+    throw error;
+  }
+  ElMessage.success('保存成功');
+  dialogVisible.value = false;
+  await loadData();
+  await loadAuxData();
+}
+
+async function remove(row: Record<string, any>) {
+  await ElMessageBox.confirm('确认删除这条数据？', '提示', { type: 'warning' });
+  try {
+    await deleteApi(moduleName.value, row.id);
+  } catch (error) {
+    if (handleCustomerScopeForbidden(error)) return;
+    throw error;
+  }
+  ElMessage.success('删除成功');
+  await loadData();
+  await loadAuxData();
+}
+
+async function submitImport() {
+  const file = fileList.value[0]?.raw;
+  if (!file || !importForm.schoolId || !importForm.gradeCode) {
+    ElMessage.warning('请选择文件、学校和年级');
+    return;
+  }
+  const data = new FormData();
+  data.append('file', file);
+  data.append('schoolId', String(importForm.schoolId));
+  data.append('gradeCode', String(importForm.gradeCode));
+  try {
+    await importCustomersApi(data);
+  } catch (error) {
+    if (handleCustomerScopeForbidden(error)) return;
+    throw error;
+  }
+  ElMessage.success('导入成功');
+  importVisible.value = false;
+  fileList.value = [];
+  await loadData();
+}
+
+watch(
+  () => moduleName.value,
+  async () => {
+    query.keyword = '';
+    query.status = undefined;
+    query.schoolId = undefined;
+    query.gradeCode = undefined;
+    query.teamId = undefined;
+    query.page = 1;
+    await loadData();
+  },
+);
+
+onMounted(async () => {
+  await loadAuxData();
+  await loadData();
+});
+</script>
+
+<template>
+  <Page :title="config.title">
+    <ElCard class="mb-4">
+      <div class="flex flex-wrap items-center gap-3">
+        <ElInput
+          v-model="query.keyword"
+          clearable
+          placeholder="关键字"
+          style="width: 220px"
+          @keyup.enter="loadData"
+        />
+        <ElSelect
+          v-if="config.filters.includes('status')"
+          v-model="query.status"
+          clearable
+          placeholder="状态"
+          style="width: 140px"
+        >
+          <ElOption
+            v-for="item in moduleName === 'customers'
+              ? customerStatusOptions
+              : statusOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </ElSelect>
+        <ElSelect
+          v-if="config.filters.includes('schoolId')"
+          v-model="query.schoolId"
+          clearable
+          filterable
+          placeholder="学校"
+          style="width: 180px"
+        >
+          <ElOption
+            v-for="item in selectOptions({ type: 'school' })"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </ElSelect>
+        <ElSelect
+          v-if="config.filters.includes('gradeCode')"
+          v-model="query.gradeCode"
+          clearable
+          filterable
+          placeholder="年级"
+          style="width: 160px"
+        >
+          <ElOption
+            v-for="item in selectOptions({ type: 'grade' })"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </ElSelect>
+        <ElSelect
+          v-if="config.filters.includes('teamId')"
+          v-model="query.teamId"
+          clearable
+          filterable
+          placeholder="团队"
+          style="width: 160px"
+        >
+          <ElOption
+            v-for="item in selectOptions({ type: 'team' })"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </ElSelect>
+        <ElButton type="primary" @click="loadData">查询</ElButton>
+        <ElButton @click="openDialog()">新增</ElButton>
+        <ElButton v-if="moduleName === 'customers'" @click="importVisible = true">
+          导入
+        </ElButton>
+      </div>
+    </ElCard>
+
+    <ElCard>
+      <ElTable v-loading="loading" :data="rows" stripe>
+        <ElTableColumn label="ID" prop="id" width="90" />
+        <ElTableColumn
+          v-for="column in config.table"
+          :key="column.field"
+          :label="column.label"
+          min-width="120"
+        >
+          <template #default="{ row }">
+            <ElTag v-if="column.type === 'status'" :type="row.status === 1 ? 'success' : 'info'">
+              {{ fmt(row[column.field], column.type) }}
+            </ElTag>
+            <span v-else>{{ fmt(row[column.field], column.type) }}</span>
+          </template>
+        </ElTableColumn>
+        <ElTableColumn fixed="right" label="操作" width="150">
+          <template #default="{ row }">
+            <ElButton link type="primary" @click="openDialog(row)">编辑</ElButton>
+            <ElButton link type="danger" @click="remove(row)">删除</ElButton>
+          </template>
+        </ElTableColumn>
+      </ElTable>
+      <div class="mt-4 flex justify-end">
+        <ElPagination
+          v-model:current-page="query.page"
+          v-model:page-size="query.pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="total"
+          background
+          layout="total, sizes, prev, pager, next"
+          @change="loadData"
+        />
+      </div>
+    </ElCard>
+
+    <ElDialog
+      v-model="dialogVisible"
+      :title="editingId ? '编辑' : '新增'"
+      width="560px"
+    >
+      <ElForm ref="formRef" :model="form" label-width="110px">
+        <ElFormItem
+          v-for="field in config.fields"
+          :key="field.field"
+          :label="field.label"
+          :prop="field.field"
+          :rules="
+            field.required && !(moduleName === 'employees' && editingId && field.field === 'password')
+              ? [{ required: true, message: `${field.label}必填`, trigger: 'blur' }]
+              : undefined
+          "
+        >
+          <ElSelect
+            v-if="
+              field.type === 'select' ||
+              field.type === 'school' ||
+              field.type === 'schoolType' ||
+              field.type === 'grade' ||
+              field.type === 'team' ||
+              field.type === 'employee'
+            "
+            v-model="form[field.field]"
+            :multiple="field.multiple"
+            clearable
+            filterable
+            style="width: 100%"
+          >
+            <ElOption
+              v-for="item in selectOptions(field)"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </ElSelect>
+          <ElSwitch v-else-if="field.type === 'switch'" v-model="form[field.field]" />
+          <ElCascader
+            v-else-if="field.type === 'scopes'"
+            v-model="scopeValue"
+            :options="schoolScopeOptions"
+            :props="scopeCascaderProps"
+            clearable
+            collapse-tags
+            filterable
+            placeholder="请选择学校和年级"
+            style="width: 100%"
+          />
+          <ElDatePicker
+            v-else-if="field.type === 'datetime'"
+            v-model="form[field.field]"
+            type="datetime"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            style="width: 100%"
+          />
+          <ElInput
+            v-else-if="field.type === 'textarea'"
+            v-model="form[field.field]"
+            :rows="3"
+            type="textarea"
+          />
+          <ElInput
+            v-else
+            v-model="form[field.field]"
+            :show-password="field.type === 'password'"
+            :type="field.type === 'password' ? 'password' : 'text'"
+          />
+        </ElFormItem>
+      </ElForm>
+      <template #footer>
+        <ElButton @click="dialogVisible = false">取消</ElButton>
+        <ElButton type="primary" @click="save">保存</ElButton>
+      </template>
+    </ElDialog>
+
+    <ElDialog v-model="importVisible" title="导入客户" width="520px">
+      <ElForm :model="importForm" label-width="90px">
+        <ElFormItem label="学校">
+          <ElSelect
+            v-model="importForm.schoolId"
+            filterable
+            placeholder="请选择学校"
+            style="width: 100%"
+          >
+            <ElOption
+              v-for="item in selectOptions({ type: 'school' })"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </ElSelect>
+        </ElFormItem>
+        <ElFormItem label="年级">
+          <ElSelect
+            v-model="importForm.gradeCode"
+            filterable
+            placeholder="请选择年级"
+            style="width: 100%"
+          >
+            <ElOption
+              v-for="item in selectOptions({ type: 'grade' })"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </ElSelect>
+        </ElFormItem>
+        <ElFormItem label="文件">
+          <ElUpload
+            v-model:file-list="fileList"
+            :auto-upload="false"
+            :limit="1"
+            accept=".xlsx,.xls,.csv"
+          >
+            <ElButton>选择文件</ElButton>
+          </ElUpload>
+        </ElFormItem>
+      </ElForm>
+      <template #footer>
+        <ElButton @click="importVisible = false">取消</ElButton>
+        <ElButton type="primary" @click="submitImport">导入</ElButton>
+      </template>
+    </ElDialog>
+  </Page>
+</template>
