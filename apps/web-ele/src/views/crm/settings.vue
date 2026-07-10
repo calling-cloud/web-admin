@@ -31,7 +31,7 @@ const form = reactive({
 
 const intentOptions = [
   { label: '未知', value: 0 },
-  { label: '低', value: 1 },
+  { label: '基本无意向', value: 1 },
   { label: '中', value: 2 },
   { label: '高', value: 3 },
   { label: '强烈', value: 4 },

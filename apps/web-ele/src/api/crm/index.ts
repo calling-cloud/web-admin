@@ -1,6 +1,7 @@
 import { requestClient } from '#/api/request';
 
 export type CrmModule =
+  | 'call-records'
   | 'customers'
   | 'employees'
   | 'menus'
@@ -16,8 +17,14 @@ export type CrmOptionModule =
   | 'teams';
 
 export interface PageParams {
+  callAtEnd?: string;
+  callAtStart?: string;
+  callEmployeeId?: number;
+  callTeamId?: number;
+  customerId?: number;
   gradeCode?: number;
   keyword?: string;
+  intentLevel?: number;
   page?: number;
   pageSize?: number;
   schoolId?: number;
@@ -79,14 +86,6 @@ export function deleteApi(module: CrmModule, id: number) {
 
 export function batchDeleteApi(module: CrmModule, ids: number[]) {
   return requestClient.post(`/${module}/batch/delete`, { ids });
-}
-
-export function batchStatusApi(
-  module: CrmModule,
-  ids: number[],
-  status: number,
-) {
-  return requestClient.post(`/${module}/batch/status`, { ids, status });
 }
 
 export function importCustomersApi(data: FormData) {

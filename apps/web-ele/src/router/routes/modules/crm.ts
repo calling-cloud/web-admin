@@ -23,6 +23,16 @@ const routes: RouteRecordRaw[] = [
       {
         component: () => import('#/views/crm/list.vue'),
         meta: {
+          crmModule: 'call-records',
+          icon: 'lucide:phone-call',
+          title: '通话记录',
+        },
+        name: 'CrmCallRecords',
+        path: 'call-records',
+      },
+      {
+        component: () => import('#/views/crm/list.vue'),
+        meta: {
           crmModule: 'schools',
           icon: 'lucide:school',
           title: '学校管理',

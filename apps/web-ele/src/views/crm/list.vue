@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import type { CrmModule, CrmOptionModule } from '#/api';
+import type { FormItemRule } from 'element-plus';
 
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
@@ -34,7 +35,6 @@ import {
 
 import {
   batchDeleteApi,
-  batchStatusApi,
   createApi,
   deleteApi,
   detailApi,
@@ -49,10 +49,6 @@ const moduleName = computed(() => route.meta.crmModule as CrmModule);
 const accessStore = useAccessStore();
 const userStore = useUserStore();
 
-const statusOptions = [
-  { label: '启用', value: 1 },
-  { label: '禁用', value: 2 },
-];
 const customerStatusOptions = [
   { label: '待分配', value: 1 },
   { label: '跟进中', value: 2 },
@@ -69,19 +65,42 @@ const buttonActionLabels: Record<string, string> = {
   create: '新增',
   delete: '删除',
   import: '导入',
-  status: '启用/禁用',
   update: '编辑',
 };
 const buttonActionsByMenuKey: Record<string, string[]> = {
   CrmSettings: ['update'],
   customers: ['create', 'update', 'delete', 'batchDelete', 'import'],
-  employees: ['create', 'update', 'delete', 'batchDelete', 'status'],
-  menus: ['create', 'update', 'delete', 'batchDelete', 'status'],
-  roles: ['create', 'update', 'delete', 'batchDelete', 'status'],
-  schools: ['create', 'update', 'delete', 'batchDelete', 'status'],
-  teams: ['create', 'update', 'delete', 'batchDelete', 'status'],
+  employees: ['create', 'update', 'delete', 'batchDelete'],
+  menus: ['create', 'update', 'delete', 'batchDelete'],
+  roles: ['create', 'update', 'delete', 'batchDelete'],
+  schools: ['create', 'update', 'delete', 'batchDelete'],
+  teams: ['create', 'update', 'delete', 'batchDelete'],
 };
+const callIntentOptions = [
+  { label: '未知', value: 0 },
+  { label: '基本无意向', value: 1 },
+  { label: '中', value: 2 },
+  { label: '高', value: 3 },
+  { label: '强烈', value: 4 },
+];
 const configs: Record<CrmModule, any> = {
+  'call-records': {
+    editable: false,
+    fields: [],
+    filters: ['callAtRange', 'callEmployeeId', 'callTeamId', 'intentLevel'],
+    title: '通话记录',
+    table: [
+      { field: 'customerName', label: '客户姓名' },
+      { field: 'customerPhone', label: '联系电话' },
+      { field: 'callEmployeeName', label: '通话员工' },
+      { field: 'callTeamName', label: '所属团队' },
+      { field: 'intentLevel', label: '意向度', type: 'intentLevel' },
+      { field: 'callAt', label: '通话时间', type: 'date' },
+      { field: 'durationSeconds', label: '时长(秒)', type: 'duration' },
+      { field: 'recordingUrl', label: '录音地址', type: 'link' },
+      { field: 'remark', label: '备注' },
+    ],
+  },
   customers: {
     title: '客户管理',
     fields: [
@@ -131,17 +150,15 @@ const configs: Record<CrmModule, any> = {
       },
       { field: 'roleId', label: '系统角色', type: 'role' },
       { field: 'isAdmin', label: '后台登录', type: 'switch' },
-      { field: 'status', label: '是否启用', type: 'statusSwitch' },
       { field: 'avatarUrl', label: '头像URL' },
     ],
-    filters: ['status', 'teamId'],
+    filters: ['teamId'],
     table: [
       { field: 'username', label: '用户名' },
       { field: 'realName', label: '姓名' },
       { field: 'phone', label: '手机号' },
       { field: 'roleName', label: '角色' },
       { field: 'isAdmin', label: '后台登录', type: 'bool' },
-      { field: 'status', label: '状态', type: 'status' },
       { field: 'lastLoginAt', label: '最后登录', type: 'date' },
     ],
   },
@@ -156,9 +173,8 @@ const configs: Record<CrmModule, any> = {
       { field: 'icon', label: '图标' },
       { field: 'moduleKey', label: '模块标识' },
       { field: 'sortOrder', label: '排序', type: 'number' },
-      { field: 'status', label: '是否启用', type: 'statusSwitch' },
     ],
-    filters: ['status'],
+    filters: [],
     table: [
       { field: 'title', label: '菜单标题' },
       { field: 'parentTitle', label: '上级菜单' },
@@ -167,7 +183,6 @@ const configs: Record<CrmModule, any> = {
       { field: 'component', label: '组件' },
       { field: 'moduleKey', label: '模块' },
       { field: 'sortOrder', label: '排序' },
-      { field: 'status', label: '状态', type: 'status' },
     ],
   },
   roles: {
@@ -182,15 +197,13 @@ const configs: Record<CrmModule, any> = {
         multiple: true,
         type: 'buttons',
       },
-      { field: 'status', label: '是否启用', type: 'statusSwitch' },
     ],
-    filters: ['status'],
+    filters: [],
     table: [
       { field: 'roleCode', label: '角色编码' },
       { field: 'roleName', label: '角色名称' },
       { field: 'menuCount', label: '菜单数' },
       { field: 'buttonCount', label: '按钮数' },
-      { field: 'status', label: '状态', type: 'status' },
       { field: 'updatedAt', label: '更新时间', type: 'date' },
     ],
   },
@@ -202,16 +215,21 @@ const configs: Record<CrmModule, any> = {
         field: 'typeCodes',
         label: '学校类型',
         multiple: true,
+        required: true,
         type: 'schoolType',
       },
-      { field: 'gradeCodes', label: '可用年级', multiple: true, type: 'grade' },
-      { field: 'status', label: '是否启用', type: 'statusSwitch' },
+      {
+        field: 'gradeCodes',
+        label: '可用年级',
+        multiple: true,
+        required: true,
+        type: 'grade',
+      },
     ],
-    filters: ['status'],
+    filters: [],
     table: [
       { field: 'schoolName', label: '学校名称' },
       { field: 'customerCount', label: '客户数' },
-      { field: 'status', label: '状态', type: 'status' },
       { field: 'updatedAt', label: '更新时间', type: 'date' },
     ],
   },
@@ -227,15 +245,12 @@ const configs: Record<CrmModule, any> = {
       },
       { field: 'leaderIds', label: '负责人', multiple: true, type: 'employee' },
       { field: 'scopes', label: '客户权限', type: 'scopes' },
-      { field: 'status', label: '是否启用', type: 'statusSwitch' },
     ],
-    filters: ['status'],
+    filters: [],
     table: [
       { field: 'teamName', label: '团队名称' },
       { field: 'memberCount', label: '成员数量' },
       { field: 'leaders', label: '负责人', type: 'tags' },
-      { field: 'scopeCount', label: '权限数量' },
-      { field: 'status', label: '状态', type: 'status' },
       { field: 'updatedAt', label: '更新时间', type: 'date' },
     ],
   },
@@ -243,6 +258,7 @@ const configs: Record<CrmModule, any> = {
 
 const config = computed(() => configs[moduleName.value]);
 const auxModulesByModule: Record<CrmModule, CrmOptionModule[]> = {
+  'call-records': ['employees', 'teams'],
   customers: ['dicts', 'schools', 'teams', 'employees'],
   employees: ['teams', 'roles'],
   menus: ['menus'],
@@ -258,8 +274,8 @@ const batchModules = new Set<CrmModule>([
   'schools',
   'teams',
 ]);
+const readOnly = computed(() => config.value.editable === false);
 const canBatch = computed(() => batchModules.has(moduleName.value));
-const canBatchStatus = computed(() => canBatch.value && moduleName.value !== 'customers');
 const currentMenuKey = computed(
   () =>
     menuKey(
@@ -267,9 +283,11 @@ const currentMenuKey = computed(
     ) || moduleName.value,
 );
 const canBulkAction = computed(
-  () => canBatch.value && (hasButton('batchDelete') || hasButton('status')),
+  () => !readOnly.value && canBatch.value && hasButton('batchDelete'),
 );
-const canOperate = computed(() => hasButton('update') || hasButton('delete'));
+const canOperate = computed(
+  () => !readOnly.value && (hasButton('update') || hasButton('delete')),
+);
 const dialogVisible = ref(false);
 const formLoading = ref(false);
 const formSaving = ref(false);
@@ -293,6 +311,10 @@ const selectedIds = computed(() =>
   selectedRows.value.map((row) => Number(row.id)).filter(Boolean),
 );
 const query = reactive<Record<string, any>>({
+  callEmployeeId: undefined,
+  callTeamId: undefined,
+  callAtRange: [],
+  intentLevel: undefined,
   keyword: '',
   page: 1,
   pageSize: 20,
@@ -318,8 +340,9 @@ function labelOf(
 
 function fmt(value: any, type?: string) {
   if (value === undefined || value === null || value === '') return '-';
-  if (type === 'status') return labelOf(statusOptions, value);
   if (type === 'customerStatus') return labelOf(customerStatusOptions, value);
+  if (type === 'duration') return `${value} 秒`;
+  if (type === 'intentLevel') return labelOf(callIntentOptions, value);
   if (type === 'bool') return value ? '是' : '否';
   if (type === 'date') return new Date(value).toLocaleString();
   return value;
@@ -356,6 +379,9 @@ function selectOptions(field: any) {
       label: item.roleName,
       value: item.id,
     }));
+  }
+  if (field.type === 'intentLevel') {
+    return callIntentOptions;
   }
   if (field.type === 'employee') {
     return dicts.employees.map((item) => ({
@@ -421,6 +447,35 @@ function buttonTreeOptions() {
     });
   }
   return nodes;
+}
+
+function fieldRules(field: any): FormItemRule[] | undefined {
+  if (
+    !field.required ||
+    (moduleName.value === 'employees' &&
+      editingId.value &&
+      field.field === 'password')
+  ) {
+    return undefined;
+  }
+  const rule: FormItemRule = {
+    message: `${field.label}必填`,
+    required: true,
+    trigger:
+      field.type === 'select' ||
+      field.type === 'school' ||
+      field.type === 'schoolType' ||
+      field.type === 'grade' ||
+      field.type === 'team' ||
+      field.type === 'role' ||
+      field.type === 'employee' ||
+      field.type === 'menu' ||
+      field.type === 'buttons'
+        ? 'change'
+        : 'blur',
+  };
+  if (field.multiple) rule.type = 'array';
+  return [rule];
 }
 
 function buildMenuTree(items: Record<string, any>[]) {
@@ -494,8 +549,19 @@ async function loadData() {
     const result = await listApi(
       moduleName.value,
       moduleName.value === 'menus'
-        ? { ...query, page: 1, pageSize: 100 }
-        : query,
+        ? {
+            ...query,
+            page: 1,
+            pageSize: 100,
+          }
+        : moduleName.value === 'call-records'
+          ? {
+              ...query,
+              callAtRange: undefined,
+              callAtEnd: query.callAtRange?.[1],
+              callAtStart: query.callAtRange?.[0],
+            }
+          : query,
     );
     rows.value =
       moduleName.value === 'menus'
@@ -536,7 +602,10 @@ async function resetForm(row?: Record<string, any>) {
   teamScopesTouched.value = false;
   Object.keys(form).forEach((key) => delete form[key]);
   const data =
-    (moduleName.value === 'teams' || moduleName.value === 'roles') && row?.id
+    (moduleName.value === 'schools' ||
+      moduleName.value === 'teams' ||
+      moduleName.value === 'roles') &&
+    row?.id
       ? await detailApi(moduleName.value, row.id)
       : row;
   for (const field of config.value.fields) {
@@ -549,9 +618,7 @@ async function resetForm(row?: Record<string, any>) {
       value ??
       (field.multiple || field.type === 'scopes'
         ? []
-        : field.type === 'statusSwitch'
-          ? 1
-          : undefined);
+        : undefined);
   }
   if (moduleName.value === 'employees' && row) {
     form.password = undefined;
@@ -658,18 +725,6 @@ async function batchRemove() {
   await Promise.all([loadAuxData(), loadData()]);
 }
 
-async function batchSetStatus(enabled: boolean) {
-  if (!selectedIds.value.length) {
-    ElMessage.warning('请先勾选数据');
-    return;
-  }
-  const status = enabled ? 1 : 2;
-  await batchStatusApi(moduleName.value, selectedIds.value, status);
-  ElMessage.success(`已${enabled ? '启用' : '禁用'}${selectedIds.value.length}条`);
-  selectedRows.value = [];
-  await Promise.all([loadAuxData(), loadData()]);
-}
-
 function openImport() {
   importForm.autoDeduplicatePhone = true;
   importForm.autoValidatePhone = true;
@@ -711,6 +766,10 @@ watch(
     query.schoolId = undefined;
     query.gradeCode = undefined;
     query.teamId = undefined;
+    query.callEmployeeId = undefined;
+    query.callAtRange = [];
+    query.callTeamId = undefined;
+    query.intentLevel = undefined;
     query.page = 1;
     selectedRows.value = [];
     await Promise.all([loadAuxData(), loadData()]);
@@ -723,8 +782,12 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Page :title="config.title">
-    <ElCard class="mb-4">
+  <Page
+    :title="config.title"
+    auto-content-height
+    content-class="crm-list-content"
+  >
+    <ElCard class="crm-search-card">
       <div class="flex flex-wrap items-center gap-3">
         <ElInput
           v-model="query.keyword"
@@ -741,9 +804,7 @@ onMounted(async () => {
           style="width: 140px"
         >
           <ElOption
-            v-for="item in moduleName === 'customers'
-              ? customerStatusOptions
-              : statusOptions"
+            v-for="item in customerStatusOptions"
             :key="item.value"
             :label="item.label"
             :value="item.value"
@@ -794,45 +855,92 @@ onMounted(async () => {
             :value="item.value"
           />
         </ElSelect>
+        <ElSelect
+          v-if="config.filters.includes('callEmployeeId')"
+          v-model="query.callEmployeeId"
+          clearable
+          filterable
+          placeholder="通话员工"
+          style="width: 160px"
+        >
+          <ElOption
+            v-for="item in selectOptions({ type: 'employee' })"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </ElSelect>
+        <ElDatePicker
+          v-if="config.filters.includes('callAtRange')"
+          v-model="query.callAtRange"
+          end-placeholder="结束时间"
+          range-separator="至"
+          start-placeholder="开始时间"
+          style="width: 340px"
+          type="datetimerange"
+          value-format="YYYY-MM-DD HH:mm:ss"
+        />
+        <ElSelect
+          v-if="config.filters.includes('callTeamId')"
+          v-model="query.callTeamId"
+          clearable
+          filterable
+          placeholder="通话团队"
+          style="width: 160px"
+        >
+          <ElOption
+            v-for="item in selectOptions({ type: 'team' })"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </ElSelect>
+        <ElSelect
+          v-if="config.filters.includes('intentLevel')"
+          v-model="query.intentLevel"
+          clearable
+          placeholder="意向度"
+          style="width: 140px"
+        >
+          <ElOption
+            v-for="item in callIntentOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </ElSelect>
         <ElButton type="primary" @click="loadData">查询</ElButton>
-        <ElButton v-if="hasButton('create')" @click="openDialog()">
-          新增
-        </ElButton>
-        <ElButton
-          v-if="canBatch && hasButton('batchDelete')"
-          :disabled="!selectedIds.length"
-          type="danger"
-          @click="batchRemove"
-        >
-          批量删除
-        </ElButton>
-        <ElButton
-          v-if="canBatchStatus && hasButton('status')"
-          :disabled="!selectedIds.length"
-          @click="batchSetStatus(true)"
-        >
-          批量启用
-        </ElButton>
-        <ElButton
-          v-if="canBatchStatus && hasButton('status')"
-          :disabled="!selectedIds.length"
-          @click="batchSetStatus(false)"
-        >
-          批量禁用
-        </ElButton>
-        <ElButton
-          v-if="moduleName === 'customers' && hasButton('import')"
-          @click="openImport"
-        >
-          导入
-        </ElButton>
       </div>
     </ElCard>
 
-    <ElCard>
+    <ElCard class="crm-table-card">
+      <div class="crm-table-toolbar">
+        <div class="flex flex-wrap items-center gap-2">
+          <ElButton
+            v-if="canBulkAction"
+            :disabled="!selectedIds.length"
+            type="danger"
+            @click="batchRemove"
+          >
+            批量删除
+          </ElButton>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <ElButton v-if="!readOnly && hasButton('create')" @click="openDialog()">
+            新增
+          </ElButton>
+          <ElButton
+            v-if="!readOnly && moduleName === 'customers' && hasButton('import')"
+            @click="openImport"
+          >
+            导入
+          </ElButton>
+        </div>
+      </div>
       <ElTable
         v-loading="loading"
         :data="rows"
+        height="100%"
         row-key="id"
         stripe
         :tree-props="{ children: 'children' }"
@@ -847,13 +955,7 @@ onMounted(async () => {
           min-width="120"
         >
           <template #default="{ row }">
-            <ElTag
-              v-if="column.type === 'status'"
-              :type="row.status === 1 ? 'success' : 'info'"
-            >
-              {{ fmt(row[column.field], column.type) }}
-            </ElTag>
-            <div v-else-if="column.type === 'tags'" class="flex flex-wrap gap-1">
+            <div v-if="column.type === 'tags'" class="flex flex-wrap gap-1">
               <ElTag
                 v-for="item in row[column.field] || []"
                 :key="item.id || item.realName"
@@ -862,6 +964,14 @@ onMounted(async () => {
                 {{ item.realName || item.name || item.label || item }}
               </ElTag>
             </div>
+            <a
+              v-else-if="column.type === 'link' && row[column.field]"
+              :href="row[column.field]"
+              rel="noreferrer"
+              target="_blank"
+            >
+              查看
+            </a>
             <span v-else>{{ fmt(row[column.field], column.type) }}</span>
           </template>
         </ElTableColumn>
@@ -898,6 +1008,7 @@ onMounted(async () => {
     </ElCard>
 
     <ElDrawer
+      v-if="!readOnly"
       v-model="dialogVisible"
       direction="rtl"
       size="560px"
@@ -916,22 +1027,7 @@ onMounted(async () => {
           :key="field.field"
           :label="field.label"
           :prop="field.field"
-          :rules="
-            field.required &&
-            !(
-              moduleName === 'employees' &&
-              editingId &&
-              field.field === 'password'
-            )
-              ? [
-                  {
-                    required: true,
-                    message: `${field.label}必填`,
-                    trigger: 'blur',
-                  },
-                ]
-              : undefined
-          "
+          :rules="fieldRules(field)"
         >
           <ElTreeSelect
             v-if="field.type === 'buttons'"
@@ -983,16 +1079,7 @@ onMounted(async () => {
               :value="item.value"
             />
           </ElSelect>
-          <ElSwitch
-            v-else-if="field.type === 'statusSwitch'"
-            v-model="form[field.field]"
-            :active-value="1"
-            :inactive-value="2"
-          />
-          <ElSwitch
-            v-else-if="field.type === 'switch'"
-            v-model="form[field.field]"
-          />
+          <ElSwitch v-else-if="field.type === 'switch'" v-model="form[field.field]" />
           <ElInputNumber
             v-else-if="field.type === 'number'"
             v-model="form[field.field]"
@@ -1050,7 +1137,7 @@ onMounted(async () => {
       </template>
     </ElDrawer>
 
-    <ElDialog v-model="importVisible" title="导入客户" width="520px">
+    <ElDialog v-if="!readOnly" v-model="importVisible" title="导入客户" width="520px">
       <ElForm :model="importForm" label-width="90px">
         <ElFormItem label="学校" required>
           <ElSelect
@@ -1110,3 +1197,53 @@ onMounted(async () => {
     </ElDialog>
   </Page>
 </template>
+
+<style scoped>
+:deep(.crm-list-content) {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.crm-search-card {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  flex: none;
+}
+
+.crm-table-card {
+  flex: 1;
+  min-height: 0;
+}
+
+.crm-table-card :deep(.el-card__body) {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.crm-table-toolbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+}
+
+.crm-table-card :deep(.el-table) {
+  flex: 1;
+  min-height: 0;
+}
+
+@media (max-width: 768px) {
+  .crm-table-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+</style>
