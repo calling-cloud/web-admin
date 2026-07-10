@@ -4,10 +4,24 @@ import { addIcon } from '@vben-core/icons';
 
 loadSvgIcons();
 
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    globalThis.location?.reload();
+  });
+}
+
 function parseSvg(svgData: string): IconifyIconStructure {
   const parser = new DOMParser();
   const xmlDoc = parser.parseFromString(svgData, 'image/svg+xml');
   const svgElement = xmlDoc.documentElement;
+
+  if (svgElement.nodeName === 'parsererror') {
+    return {
+      body: '',
+      height: 0,
+      width: 0,
+    };
+  }
 
   // 提取 SVG 根元素的关键样式属性
   const getAttrs = (el: Element, attrs: string[]) =>
@@ -61,7 +75,7 @@ async function loadSvgIcons() {
     return;
   }
 
-  const svgEagers = import.meta.glob('./icons/**', {
+  const svgEagers = import.meta.glob('./icons/**/*.svg', {
     eager: true,
     query: '?raw',
   });

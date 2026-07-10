@@ -10,10 +10,8 @@ import { VbenFullScreen, VbenIconButton } from '@vben-core/shadcn-ui';
 
 import {
   GlobalSearch,
-  LanguageToggle,
   PreferencesButton,
   ThemeToggle,
-  TimezoneButton,
 } from '../../widgets';
 
 interface Props {
@@ -67,18 +65,6 @@ const rightSlots = computed(() => {
         name: 'theme-toggle',
       });
     }
-    if (preferences.widget.languageToggle) {
-      list.push({
-        index: REFERENCE_VALUE + 30,
-        name: 'language-toggle',
-      });
-    }
-    if (preferences.widget.timezone) {
-      list.push({
-        index: REFERENCE_VALUE + 40,
-        name: 'timezone',
-      });
-    }
   }
   // 全屏
   if (preferences.widget.fullscreen) {
@@ -87,14 +73,6 @@ const rightSlots = computed(() => {
       name: 'fullscreen',
     });
   }
-  // 消息通知
-  if (preferences.widget.notification) {
-    list.push({
-      index: REFERENCE_VALUE + 60,
-      name: 'notification',
-    });
-  }
-
   Object.keys(slots).forEach((key) => {
     // 适配插槽名称，例如第一个插槽名：header-right-1
     if (key.startsWith('header-right')) {
@@ -197,14 +175,8 @@ function clearPreferencesAndLogout() {
         <template v-else-if="slot.name === 'theme-toggle'">
           <ThemeToggle class="mt-0.5 mr-1" />
         </template>
-        <template v-else-if="slot.name === 'language-toggle'">
-          <LanguageToggle class="mr-1" />
-        </template>
         <template v-else-if="slot.name === 'fullscreen'">
           <VbenFullScreen class="mr-1" />
-        </template>
-        <template v-else-if="slot.name === 'timezone'">
-          <TimezoneButton class="mt-0.5 mr-1" />
         </template>
       </slot>
     </template>

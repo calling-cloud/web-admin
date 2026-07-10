@@ -57,10 +57,41 @@ const routes: RouteRecordRaw[] = [
     meta: {
       icon: 'lucide:settings',
       order: 2,
-      title: '系统设置',
+      title: '系统配置',
     },
     name: 'CrmSettings',
     path: '/settings',
+  },
+  {
+    meta: {
+      icon: 'lucide:shield',
+      order: 3,
+      title: '系统管理',
+    },
+    name: 'System',
+    path: '/system',
+    children: [
+      {
+        component: () => import('#/views/crm/list.vue'),
+        meta: {
+          crmModule: 'roles',
+          icon: 'lucide:shield-check',
+          title: '角色管理',
+        },
+        name: 'SystemRoles',
+        path: 'roles',
+      },
+      {
+        component: () => import('#/views/crm/list.vue'),
+        meta: {
+          crmModule: 'menus',
+          icon: 'lucide:menu',
+          title: '菜单管理',
+        },
+        name: 'SystemMenus',
+        path: 'menus',
+      },
+    ],
   },
 ];
 

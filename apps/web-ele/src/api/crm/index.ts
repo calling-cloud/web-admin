@@ -1,6 +1,12 @@
 import { requestClient } from '#/api/request';
 
-export type CrmModule = 'customers' | 'employees' | 'schools' | 'teams';
+export type CrmModule =
+  | 'customers'
+  | 'employees'
+  | 'menus'
+  | 'roles'
+  | 'schools'
+  | 'teams';
 
 export interface PageParams {
   gradeCode?: number;
@@ -24,6 +30,12 @@ export interface DictItem {
   gradeName?: string;
   typeCode?: number;
   typeName?: string;
+}
+
+export interface ImportCustomersResult {
+  duplicatePhones: Record<string, any>[];
+  imported: Record<string, any>[];
+  invalidPhones: Record<string, any>[];
 }
 
 export interface SettingsInput {
@@ -58,8 +70,20 @@ export function deleteApi(module: CrmModule, id: number) {
   return requestClient.delete(`/${module}/${id}`);
 }
 
+export function batchDeleteApi(module: CrmModule, ids: number[]) {
+  return requestClient.post(`/${module}/batch/delete`, { ids });
+}
+
+export function batchStatusApi(
+  module: CrmModule,
+  ids: number[],
+  status: number,
+) {
+  return requestClient.post(`/${module}/batch/status`, { ids, status });
+}
+
 export function importCustomersApi(data: FormData) {
-  return requestClient.post('/customers/import', data, {
+  return requestClient.post<ImportCustomersResult>('/customers/import', data, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
 }

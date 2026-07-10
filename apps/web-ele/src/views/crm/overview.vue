@@ -1,16 +1,20 @@
 <script lang="ts" setup>
-import type { AnalysisOverviewItem } from '@vben/common-ui';
+import type { Component } from 'vue';
+
 import type { EchartsUIType } from '@vben/plugins/echarts';
 
 import { computed, onMounted, ref } from 'vue';
 
-import { AnalysisOverview, Page } from '@vben/common-ui';
+import { Page, VbenCountToAnimator } from '@vben/common-ui';
 import {
-  SvgBellIcon,
+  SvgBangDingIcon,
   SvgCakeIcon,
-  SvgCardIcon,
-  SvgDownloadIcon,
-  SvgQQChatIcon,
+  SvgGouTongIcon,
+  SvgJiangBeiIcon,
+  SvgKeHuZongShuIcon,
+  SvgSchoolIcon,
+  SvgTeamIcon,
+  SvgYuanGongIcon,
 } from '@vben/icons';
 import { EchartsUI, useEcharts } from '@vben/plugins/echarts';
 
@@ -31,26 +35,88 @@ const statusText: Record<number, string> = {
   4: '无效',
 };
 
-const cards = [
-  { field: 'customerTotal', icon: SvgCardIcon, title: '客户总数' },
-  { field: 'dealTotal', icon: SvgCakeIcon, title: '成交客户' },
-  { field: 'schoolTotal', icon: SvgDownloadIcon, title: '学校数量' },
-  { field: 'teamTotal', icon: SvgQQChatIcon, title: '团队数量' },
-  { field: 'employeeTotal', icon: SvgBellIcon, title: '员工数量' },
+type OverviewCard = {
+  description: string;
+  field: string;
+  icon: Component | string;
+  title: string;
+  type: 'count' | 'percent';
+};
+
+const cards: OverviewCard[] = [
+  {
+    description: '当前客户总量',
+    field: 'customerTotal',
+    icon: SvgKeHuZongShuIcon,
+    title: '客户总数',
+    type: 'count',
+  },
+  {
+    description: '已成交客户数量',
+    field: 'dealTotal',
+    icon: SvgJiangBeiIcon,
+    title: '成交客户',
+    type: 'count',
+  },
+  {
+    description: '已绑定学校数量',
+    field: 'schoolTotal',
+    icon: SvgSchoolIcon,
+    title: '学校数量',
+    type: 'count',
+  },
+  {
+    description: '当前团队数量',
+    field: 'teamTotal',
+    icon: SvgTeamIcon,
+    title: '团队数量',
+    type: 'count',
+  },
+  {
+    description: '员工数量',
+    field: 'employeeTotal',
+    icon: SvgYuanGongIcon,
+    title: '员工数量',
+    type: 'count',
+  },
+  {
+    description: '已分配给团队或员工的客户',
+    field: 'assignedCustomerTotal',
+    icon: SvgBangDingIcon,
+    title: '已分配客户',
+    type: 'count',
+  },
+  {
+    description: '客户沟通记录总数',
+    field: 'communicationTotal',
+    icon: SvgGouTongIcon,
+    title: '累计沟通次数',
+    type: 'count',
+  },
+  {
+    description: '已成交 / 已分配',
+    field: 'conversionRate',
+    icon: SvgCakeIcon,
+    title: '成交率',
+    type: 'percent',
+  },
 ];
 
-const overviewItems = computed<AnalysisOverviewItem[]>(() =>
+const overviewItems = computed(() =>
   cards.map((card) => {
-    const value = Number(stats.value[card.field] ?? 0);
     return {
       icon: card.icon,
       title: card.title,
-      totalTitle: '总数',
-      totalValue: value,
-      value,
+      description: card.description,
+      type: card.type,
+      value: Number(stats.value[card.field] ?? 0),
     };
   }),
 );
+
+function formatPercent(value: number) {
+  return `${value.toFixed(2)}%`;
+}
 
 function renderCharts() {
   renderStatusChart({
@@ -163,7 +229,29 @@ onMounted(async () => {
 
 <template>
   <Page title="概览">
-    <AnalysisOverview :items="overviewItems" />
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <ElCard v-for="item in overviewItems" :key="item.title" class="w-full" shadow="never">
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0">
+            <div class="text-sm font-medium text-muted-foreground">
+              {{ item.title }}
+            </div>
+            <div class="mt-2 text-3xl font-semibold tabular-nums">
+              <template v-if="item.type === 'percent'">
+                {{ formatPercent(item.value) }}
+              </template>
+              <template v-else>
+                <VbenCountToAnimator :end-val="item.value" :start-val="0" prefix="" />
+              </template>
+            </div>
+            <div class="mt-1 text-xs text-muted-foreground">
+              {{ item.description }}
+            </div>
+          </div>
+          <component :is="item.icon" class="mt-1 size-8 shrink-0 text-primary" />
+        </div>
+      </ElCard>
+    </div>
 
     <div class="mt-4 grid gap-4 lg:grid-cols-2">
       <ElCard>

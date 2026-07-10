@@ -5,16 +5,20 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 import { Page } from '@vben/common-ui';
+import { useAccessStore, useUserStore } from '@vben/stores';
 
 import {
   ElButton,
   ElCard,
   ElCascader,
+  ElCheckbox,
   ElDatePicker,
   ElDialog,
+  ElDrawer,
   ElForm,
   ElFormItem,
   ElInput,
+  ElInputNumber,
   ElMessage,
   ElMessageBox,
   ElOption,
@@ -24,10 +28,13 @@ import {
   ElTable,
   ElTableColumn,
   ElTag,
+  ElTreeSelect,
   ElUpload,
 } from 'element-plus';
 
 import {
+  batchDeleteApi,
+  batchStatusApi,
   createApi,
   deleteApi,
   detailApi,
@@ -39,6 +46,8 @@ import {
 
 const route = useRoute();
 const moduleName = computed(() => route.meta.crmModule as CrmModule);
+const accessStore = useAccessStore();
+const userStore = useUserStore();
 
 const statusOptions = [
   { label: '启用', value: 1 },
@@ -55,6 +64,23 @@ const genderOptions = [
   { label: '男', value: 1 },
   { label: '女', value: 2 },
 ];
+const buttonActionLabels: Record<string, string> = {
+  batchDelete: '批量删除',
+  create: '新增',
+  delete: '删除',
+  import: '导入',
+  status: '启用/禁用',
+  update: '编辑',
+};
+const buttonActionsByMenuKey: Record<string, string[]> = {
+  CrmSettings: ['update'],
+  customers: ['create', 'update', 'delete', 'batchDelete', 'import'],
+  employees: ['create', 'update', 'delete', 'batchDelete', 'status'],
+  menus: ['create', 'update', 'delete', 'batchDelete', 'status'],
+  roles: ['create', 'update', 'delete', 'batchDelete', 'status'],
+  schools: ['create', 'update', 'delete', 'batchDelete', 'status'],
+  teams: ['create', 'update', 'delete', 'batchDelete', 'status'],
+};
 const configs: Record<CrmModule, any> = {
   customers: {
     title: '客户管理',
@@ -78,8 +104,8 @@ const configs: Record<CrmModule, any> = {
     table: [
       { field: 'customerName', label: '客户姓名' },
       { field: 'phone', label: '联系电话' },
-      { field: 'schoolId', label: '学校ID' },
-      { field: 'gradeCode', label: '年级' },
+      { field: 'schoolName', label: '所属学校' },
+      { field: 'gradeName', label: '年级' },
       { field: 'assignedCount', label: '分配次数' },
       { field: 'status', label: '状态', type: 'customerStatus' },
       { field: 'updatedAt', label: '更新时间', type: 'date' },
@@ -89,12 +115,23 @@ const configs: Record<CrmModule, any> = {
     title: '员工管理',
     fields: [
       { field: 'username', label: '登录用户名', required: true },
-      { field: 'password', label: '登录密码', required: true, type: 'password' },
+      {
+        field: 'password',
+        label: '登录密码',
+        required: true,
+        type: 'password',
+      },
       { field: 'realName', label: '员工姓名', required: true },
       { field: 'phone', label: '手机号', required: true },
-      { field: 'gender', label: '性别', options: genderOptions, type: 'select' },
-      { field: 'isAdmin', label: '管理员', type: 'switch' },
-      { field: 'status', label: '状态', options: statusOptions, type: 'select' },
+      {
+        field: 'gender',
+        label: '性别',
+        options: genderOptions,
+        type: 'select',
+      },
+      { field: 'roleId', label: '系统角色', type: 'role' },
+      { field: 'isAdmin', label: '后台登录', type: 'switch' },
+      { field: 'status', label: '是否启用', type: 'statusSwitch' },
       { field: 'avatarUrl', label: '头像URL' },
     ],
     filters: ['status', 'teamId'],
@@ -102,9 +139,59 @@ const configs: Record<CrmModule, any> = {
       { field: 'username', label: '用户名' },
       { field: 'realName', label: '姓名' },
       { field: 'phone', label: '手机号' },
-      { field: 'isAdmin', label: '管理员', type: 'bool' },
+      { field: 'roleName', label: '角色' },
+      { field: 'isAdmin', label: '后台登录', type: 'bool' },
       { field: 'status', label: '状态', type: 'status' },
       { field: 'lastLoginAt', label: '最后登录', type: 'date' },
+    ],
+  },
+  menus: {
+    title: '菜单管理',
+    fields: [
+      { field: 'parentId', label: '上级菜单', type: 'menu' },
+      { field: 'title', label: '菜单标题', required: true },
+      { field: 'routeName', label: '路由名称', required: true },
+      { field: 'path', label: '路由路径', required: true },
+      { field: 'component', label: '组件路径' },
+      { field: 'icon', label: '图标' },
+      { field: 'moduleKey', label: '模块标识' },
+      { field: 'sortOrder', label: '排序', type: 'number' },
+      { field: 'status', label: '是否启用', type: 'statusSwitch' },
+    ],
+    filters: ['status'],
+    table: [
+      { field: 'title', label: '菜单标题' },
+      { field: 'parentTitle', label: '上级菜单' },
+      { field: 'routeName', label: '路由名称' },
+      { field: 'path', label: '路径' },
+      { field: 'component', label: '组件' },
+      { field: 'moduleKey', label: '模块' },
+      { field: 'sortOrder', label: '排序' },
+      { field: 'status', label: '状态', type: 'status' },
+    ],
+  },
+  roles: {
+    title: '角色管理',
+    fields: [
+      { field: 'roleCode', label: '角色编码', required: true },
+      { field: 'roleName', label: '角色名称', required: true },
+      { field: 'menuIds', label: '可见菜单', multiple: true, type: 'menu' },
+      {
+        field: 'buttonCodes',
+        label: '按钮权限',
+        multiple: true,
+        type: 'buttons',
+      },
+      { field: 'status', label: '是否启用', type: 'statusSwitch' },
+    ],
+    filters: ['status'],
+    table: [
+      { field: 'roleCode', label: '角色编码' },
+      { field: 'roleName', label: '角色名称' },
+      { field: 'menuCount', label: '菜单数' },
+      { field: 'buttonCount', label: '按钮数' },
+      { field: 'status', label: '状态', type: 'status' },
+      { field: 'updatedAt', label: '更新时间', type: 'date' },
     ],
   },
   schools: {
@@ -118,7 +205,7 @@ const configs: Record<CrmModule, any> = {
         type: 'schoolType',
       },
       { field: 'gradeCodes', label: '可用年级', multiple: true, type: 'grade' },
-      { field: 'status', label: '状态', options: statusOptions, type: 'select' },
+      { field: 'status', label: '是否启用', type: 'statusSwitch' },
     ],
     filters: ['status'],
     table: [
@@ -132,16 +219,21 @@ const configs: Record<CrmModule, any> = {
     title: '团队管理',
     fields: [
       { field: 'teamName', label: '团队名称', required: true },
-      { field: 'memberIds', label: '团队成员', multiple: true, type: 'employee' },
+      {
+        field: 'memberIds',
+        label: '团队成员',
+        multiple: true,
+        type: 'employee',
+      },
       { field: 'leaderIds', label: '负责人', multiple: true, type: 'employee' },
       { field: 'scopes', label: '客户权限', type: 'scopes' },
-      { field: 'status', label: '状态', options: statusOptions, type: 'select' },
+      { field: 'status', label: '是否启用', type: 'statusSwitch' },
     ],
     filters: ['status'],
     table: [
       { field: 'teamName', label: '团队名称' },
       { field: 'memberCount', label: '成员数量' },
-      { field: 'leaderCount', label: '负责人数' },
+      { field: 'leaders', label: '负责人', type: 'tags' },
       { field: 'scopeCount', label: '权限数量' },
       { field: 'status', label: '状态', type: 'status' },
       { field: 'updatedAt', label: '更新时间', type: 'date' },
@@ -150,17 +242,46 @@ const configs: Record<CrmModule, any> = {
 };
 
 const config = computed(() => configs[moduleName.value]);
+const batchModules = new Set<CrmModule>([
+  'customers',
+  'employees',
+  'menus',
+  'roles',
+  'schools',
+  'teams',
+]);
+const canBatch = computed(() => batchModules.has(moduleName.value));
+const canBatchStatus = computed(() => canBatch.value && moduleName.value !== 'customers');
+const currentMenuKey = computed(
+  () =>
+    menuKey(
+      dicts.menus.find((item) => item.moduleKey === moduleName.value),
+    ) || moduleName.value,
+);
+const canBulkAction = computed(
+  () => canBatch.value && (hasButton('batchDelete') || hasButton('status')),
+);
+const canOperate = computed(() => hasButton('update') || hasButton('delete'));
 const dialogVisible = ref(false);
 const importVisible = ref(false);
 const editingId = ref<number>();
 const loading = ref(false);
 const rows = ref<Record<string, any>[]>([]);
+const selectedRows = ref<Record<string, any>[]>([]);
 const total = ref(0);
 const fileList = ref<any[]>([]);
 const formRef = ref();
 const teamScopesTouched = ref(false);
 const form = reactive<Record<string, any>>({});
-const importForm = reactive({ gradeCode: undefined, schoolId: undefined });
+const importForm = reactive({
+  autoDeduplicatePhone: true,
+  autoValidatePhone: true,
+  gradeCode: undefined,
+  schoolId: undefined,
+});
+const selectedIds = computed(() =>
+  selectedRows.value.map((row) => Number(row.id)).filter(Boolean),
+);
 const query = reactive<Record<string, any>>({
   keyword: '',
   page: 1,
@@ -169,13 +290,20 @@ const query = reactive<Record<string, any>>({
 const dicts = reactive({
   employees: [] as Record<string, any>[],
   grades: [] as Record<string, any>[],
+  menus: [] as Record<string, any>[],
+  roles: [] as Record<string, any>[],
   schools: [] as Record<string, any>[],
   schoolTypes: [] as Record<string, any>[],
   teams: [] as Record<string, any>[],
 });
 
-function labelOf(options: readonly { label: string; value: number }[], value: any) {
-  return options.find((item) => item.value === Number(value))?.label || value || '-';
+function labelOf(
+  options: readonly { label: string; value: number }[],
+  value: any,
+) {
+  return (
+    options.find((item) => item.value === Number(value))?.label || value || '-'
+  );
 }
 
 function fmt(value: any, type?: string) {
@@ -213,6 +341,12 @@ function selectOptions(field: any) {
       value: item.id,
     }));
   }
+  if (field.type === 'role') {
+    return dicts.roles.map((item) => ({
+      label: item.roleName,
+      value: item.id,
+    }));
+  }
   if (field.type === 'employee') {
     return dicts.employees.map((item) => ({
       label: item.realName,
@@ -220,6 +354,78 @@ function selectOptions(field: any) {
     }));
   }
   return [];
+}
+
+function menuTreeOptions(disableId?: number) {
+  const nodes = new Map<number, Record<string, any>>();
+  const roots: Record<string, any>[] = [];
+  for (const item of dicts.menus) {
+    nodes.set(item.id, {
+      children: [],
+      disabled: item.id === disableId,
+      label: item.title,
+      value: item.id,
+    });
+  }
+  for (const item of dicts.menus) {
+    const node = nodes.get(item.id)!;
+    if (item.parentId && nodes.has(item.parentId)) {
+      nodes.get(item.parentId)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+  const disableChildren = (node?: Record<string, any>) => {
+    if (!node) return;
+    node.disabled = true;
+    for (const child of node.children) disableChildren(child);
+  };
+  disableChildren(disableId ? nodes.get(disableId) : undefined);
+  return roots;
+}
+
+function menuKey(item?: Record<string, any>) {
+  return item ? item.moduleKey || item.routeName : '';
+}
+
+function hasButton(action: string) {
+  return (
+    userStore.userRoles.includes('admin') ||
+    accessStore.accessCodes.includes(`${currentMenuKey.value}:${action}`)
+  );
+}
+
+function buttonTreeOptions() {
+  const nodes: Record<string, any>[] = [];
+  for (const item of dicts.menus) {
+    const actions = buttonActionsByMenuKey[menuKey(item)] || [];
+    if (!actions.length) continue;
+    nodes.push({
+      children: actions.map((code) => ({
+        label: buttonActionLabels[code] || code,
+        value: `${item.id}:${code}`,
+      })),
+      disabled: true,
+      label: item.title,
+      value: `menu:${item.id}`,
+    });
+  }
+  return nodes;
+}
+
+function buildMenuTree(items: Record<string, any>[]) {
+  const nodes = new Map<number, Record<string, any>>();
+  const roots: Record<string, any>[] = [];
+  for (const item of items) nodes.set(item.id, { ...item, children: [] });
+  for (const item of items) {
+    const node = nodes.get(item.id)!;
+    if (item.parentId && nodes.has(item.parentId)) {
+      nodes.get(item.parentId)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+  return roots;
 }
 
 const scopeCascaderProps = { multiple: true };
@@ -260,24 +466,36 @@ const scopeValue = computed({
 });
 
 async function loadAuxData() {
-  const [dictRes, schools, teams, employees] = await Promise.all([
+  const [dictRes, schools, teams, employees, roles, menus] = await Promise.all([
     dictsApi(),
     listApi('schools', { page: 1, pageSize: 100 }),
     listApi('teams', { page: 1, pageSize: 100 }),
     listApi('employees', { page: 1, pageSize: 100 }),
+    listApi('roles', { page: 1, pageSize: 100 }),
+    listApi('menus', { page: 1, pageSize: 100 }),
   ]);
   dicts.grades = dictRes.grades || [];
   dicts.schoolTypes = dictRes.schoolTypes || [];
   dicts.schools = schools.items || [];
   dicts.teams = teams.items || [];
   dicts.employees = employees.items || [];
+  dicts.roles = roles.items || [];
+  dicts.menus = menus.items || [];
 }
 
 async function loadData() {
   loading.value = true;
   try {
-    const result = await listApi(moduleName.value, query);
-    rows.value = result.items || [];
+    const result = await listApi(
+      moduleName.value,
+      moduleName.value === 'menus'
+        ? { ...query, page: 1, pageSize: 100 }
+        : query,
+    );
+    rows.value =
+      moduleName.value === 'menus'
+        ? buildMenuTree(result.items || [])
+        : result.items || [];
     total.value = result.total || 0;
   } catch (error) {
     if (handleCustomerScopeForbidden(error)) {
@@ -313,16 +531,21 @@ async function resetForm(row?: Record<string, any>) {
   teamScopesTouched.value = false;
   Object.keys(form).forEach((key) => delete form[key]);
   const data =
-    moduleName.value === 'teams' && row?.id
-      ? await detailApi('teams', row.id)
+    (moduleName.value === 'teams' || moduleName.value === 'roles') && row?.id
+      ? await detailApi(moduleName.value, row.id)
       : row;
   for (const field of config.value.fields) {
+    const value = data?.[field.field];
+    if (field.type === 'switch') {
+      form[field.field] = value === true || value === 1 || value === '1';
+      continue;
+    }
     form[field.field] =
-      data?.[field.field] ??
+      value ??
       (field.multiple || field.type === 'scopes'
         ? []
-        : field.type === 'switch'
-          ? false
+        : field.type === 'statusSwitch'
+          ? 1
           : undefined);
   }
   if (moduleName.value === 'employees' && row) {
@@ -337,7 +560,9 @@ async function openDialog(row?: Record<string, any>) {
 
 function payload() {
   const data = Object.fromEntries(
-    Object.entries(form).filter(([, value]) => value !== '' && value !== undefined),
+    Object.entries(form).filter(
+      ([, value]) => value !== '' && value !== undefined,
+    ),
   );
   if (moduleName.value === 'employees' && editingId.value && !data.password) {
     delete data.password;
@@ -348,6 +573,23 @@ function payload() {
     !teamScopesTouched.value
   ) {
     delete data.scopes;
+  }
+  if (
+    moduleName.value === 'menus' &&
+    editingId.value &&
+    form.parentId === undefined
+  ) {
+    data.parentId = null;
+  }
+  if (
+    moduleName.value === 'roles' &&
+    Array.isArray(data.buttonCodes) &&
+    Array.isArray(data.menuIds)
+  ) {
+    const menuIds = new Set(data.menuIds.map(Number));
+    data.buttonCodes = data.buttonCodes.filter((code: string) =>
+      menuIds.has(Number(code.split(':')[0])),
+    );
   }
   return data;
 }
@@ -383,6 +625,42 @@ async function remove(row: Record<string, any>) {
   await loadAuxData();
 }
 
+async function batchRemove() {
+  if (!selectedIds.value.length) {
+    ElMessage.warning('请先勾选数据');
+    return;
+  }
+  await ElMessageBox.confirm(
+    `确认删除选中的${selectedIds.value.length}条数据？`,
+    '提示',
+    { type: 'warning' },
+  );
+  await batchDeleteApi(moduleName.value, selectedIds.value);
+  ElMessage.success(`已删除${selectedIds.value.length}条`);
+  selectedRows.value = [];
+  await loadData();
+  await loadAuxData();
+}
+
+async function batchSetStatus(enabled: boolean) {
+  if (!selectedIds.value.length) {
+    ElMessage.warning('请先勾选数据');
+    return;
+  }
+  const status = enabled ? 1 : 2;
+  await batchStatusApi(moduleName.value, selectedIds.value, status);
+  ElMessage.success(`已${enabled ? '启用' : '禁用'}${selectedIds.value.length}条`);
+  selectedRows.value = [];
+  await loadData();
+  await loadAuxData();
+}
+
+function openImport() {
+  importForm.autoDeduplicatePhone = true;
+  importForm.autoValidatePhone = true;
+  importVisible.value = true;
+}
+
 async function submitImport() {
   const file = fileList.value[0]?.raw;
   if (!file || !importForm.schoolId || !importForm.gradeCode) {
@@ -393,13 +671,18 @@ async function submitImport() {
   data.append('file', file);
   data.append('schoolId', String(importForm.schoolId));
   data.append('gradeCode', String(importForm.gradeCode));
+  data.append('autoDeduplicatePhone', String(importForm.autoDeduplicatePhone));
+  data.append('autoValidatePhone', String(importForm.autoValidatePhone));
+  let result;
   try {
-    await importCustomersApi(data);
+    result = await importCustomersApi(data);
   } catch (error) {
     if (handleCustomerScopeForbidden(error)) return;
     throw error;
   }
-  ElMessage.success('导入成功');
+  ElMessage.success(
+    `导入成功：成功${result.imported.length}条，重复手机号${result.duplicatePhones.length}条，非法手机号${result.invalidPhones.length}条`,
+  );
   importVisible.value = false;
   fileList.value = [];
   await loadData();
@@ -414,6 +697,7 @@ watch(
     query.gradeCode = undefined;
     query.teamId = undefined;
     query.page = 1;
+    selectedRows.value = [];
     await loadData();
   },
 );
@@ -497,15 +781,50 @@ onMounted(async () => {
           />
         </ElSelect>
         <ElButton type="primary" @click="loadData">查询</ElButton>
-        <ElButton @click="openDialog()">新增</ElButton>
-        <ElButton v-if="moduleName === 'customers'" @click="importVisible = true">
+        <ElButton v-if="hasButton('create')" @click="openDialog()">
+          新增
+        </ElButton>
+        <ElButton
+          v-if="canBatch && hasButton('batchDelete')"
+          :disabled="!selectedIds.length"
+          type="danger"
+          @click="batchRemove"
+        >
+          批量删除
+        </ElButton>
+        <ElButton
+          v-if="canBatchStatus && hasButton('status')"
+          :disabled="!selectedIds.length"
+          @click="batchSetStatus(true)"
+        >
+          批量启用
+        </ElButton>
+        <ElButton
+          v-if="canBatchStatus && hasButton('status')"
+          :disabled="!selectedIds.length"
+          @click="batchSetStatus(false)"
+        >
+          批量禁用
+        </ElButton>
+        <ElButton
+          v-if="moduleName === 'customers' && hasButton('import')"
+          @click="openImport"
+        >
           导入
         </ElButton>
       </div>
     </ElCard>
 
     <ElCard>
-      <ElTable v-loading="loading" :data="rows" stripe>
+      <ElTable
+        v-loading="loading"
+        :data="rows"
+        row-key="id"
+        stripe
+        :tree-props="{ children: 'children' }"
+        @selection-change="selectedRows = $event"
+      >
+        <ElTableColumn v-if="canBulkAction" type="selection" width="48" />
         <ElTableColumn label="ID" prop="id" width="90" />
         <ElTableColumn
           v-for="column in config.table"
@@ -514,20 +833,44 @@ onMounted(async () => {
           min-width="120"
         >
           <template #default="{ row }">
-            <ElTag v-if="column.type === 'status'" :type="row.status === 1 ? 'success' : 'info'">
+            <ElTag
+              v-if="column.type === 'status'"
+              :type="row.status === 1 ? 'success' : 'info'"
+            >
               {{ fmt(row[column.field], column.type) }}
             </ElTag>
+            <div v-else-if="column.type === 'tags'" class="flex flex-wrap gap-1">
+              <ElTag
+                v-for="item in row[column.field] || []"
+                :key="item.id || item.realName"
+                size="small"
+              >
+                {{ item.realName || item.name || item.label || item }}
+              </ElTag>
+            </div>
             <span v-else>{{ fmt(row[column.field], column.type) }}</span>
           </template>
         </ElTableColumn>
-        <ElTableColumn fixed="right" label="操作" width="150">
+        <ElTableColumn v-if="canOperate" fixed="right" label="操作" width="150">
           <template #default="{ row }">
-            <ElButton link type="primary" @click="openDialog(row)">编辑</ElButton>
-            <ElButton link type="danger" @click="remove(row)">删除</ElButton>
+            <ElButton
+              v-if="hasButton('update')"
+              link
+              type="primary"
+              @click="openDialog(row)"
+              >编辑</ElButton
+            >
+            <ElButton
+              v-if="hasButton('delete')"
+              link
+              type="danger"
+              @click="remove(row)"
+              >删除</ElButton
+            >
           </template>
         </ElTableColumn>
       </ElTable>
-      <div class="mt-4 flex justify-end">
+      <div v-if="moduleName !== 'menus'" class="mt-4 flex justify-end">
         <ElPagination
           v-model:current-page="query.page"
           v-model:page-size="query.pageSize"
@@ -540,10 +883,11 @@ onMounted(async () => {
       </div>
     </ElCard>
 
-    <ElDialog
+    <ElDrawer
       v-model="dialogVisible"
+      direction="rtl"
+      size="560px"
       :title="editingId ? '编辑' : '新增'"
-      width="560px"
     >
       <ElForm ref="formRef" :model="form" label-width="110px">
         <ElFormItem
@@ -552,18 +896,57 @@ onMounted(async () => {
           :label="field.label"
           :prop="field.field"
           :rules="
-            field.required && !(moduleName === 'employees' && editingId && field.field === 'password')
-              ? [{ required: true, message: `${field.label}必填`, trigger: 'blur' }]
+            field.required &&
+            !(
+              moduleName === 'employees' &&
+              editingId &&
+              field.field === 'password'
+            )
+              ? [
+                  {
+                    required: true,
+                    message: `${field.label}必填`,
+                    trigger: 'blur',
+                  },
+                ]
               : undefined
           "
         >
+          <ElTreeSelect
+            v-if="field.type === 'buttons'"
+            v-model="form[field.field]"
+            clearable
+            collapse-tags
+            :data="buttonTreeOptions()"
+            filterable
+            :multiple="field.multiple"
+            node-key="value"
+            :show-checkbox="field.multiple"
+            style="width: 100%"
+          />
+          <ElTreeSelect
+            v-else-if="field.type === 'menu'"
+            v-model="form[field.field]"
+            check-strictly
+            clearable
+            collapse-tags
+            :data="
+              menuTreeOptions(moduleName === 'menus' ? editingId : undefined)
+            "
+            filterable
+            :multiple="field.multiple"
+            node-key="value"
+            :show-checkbox="field.multiple"
+            style="width: 100%"
+          />
           <ElSelect
-            v-if="
+            v-else-if="
               field.type === 'select' ||
               field.type === 'school' ||
               field.type === 'schoolType' ||
               field.type === 'grade' ||
               field.type === 'team' ||
+              field.type === 'role' ||
               field.type === 'employee'
             "
             v-model="form[field.field]"
@@ -579,7 +962,21 @@ onMounted(async () => {
               :value="item.value"
             />
           </ElSelect>
-          <ElSwitch v-else-if="field.type === 'switch'" v-model="form[field.field]" />
+          <ElSwitch
+            v-else-if="field.type === 'statusSwitch'"
+            v-model="form[field.field]"
+            :active-value="1"
+            :inactive-value="2"
+          />
+          <ElSwitch
+            v-else-if="field.type === 'switch'"
+            v-model="form[field.field]"
+          />
+          <ElInputNumber
+            v-else-if="field.type === 'number'"
+            v-model="form[field.field]"
+            style="width: 100%"
+          />
           <ElCascader
             v-else-if="field.type === 'scopes'"
             v-model="scopeValue"
@@ -607,6 +1004,11 @@ onMounted(async () => {
           <ElInput
             v-else
             v-model="form[field.field]"
+            :disabled="
+              moduleName === 'roles' &&
+              form.roleCode === 'admin' &&
+              (field.field === 'roleCode' || field.field === 'roleName')
+            "
             :show-password="field.type === 'password'"
             :type="field.type === 'password' ? 'password' : 'text'"
           />
@@ -614,13 +1016,18 @@ onMounted(async () => {
       </ElForm>
       <template #footer>
         <ElButton @click="dialogVisible = false">取消</ElButton>
-        <ElButton type="primary" @click="save">保存</ElButton>
+        <ElButton
+          v-if="hasButton(editingId ? 'update' : 'create')"
+          type="primary"
+          @click="save"
+          >保存</ElButton
+        >
       </template>
-    </ElDialog>
+    </ElDrawer>
 
     <ElDialog v-model="importVisible" title="导入客户" width="520px">
       <ElForm :model="importForm" label-width="90px">
-        <ElFormItem label="学校">
+        <ElFormItem label="学校" required>
           <ElSelect
             v-model="importForm.schoolId"
             filterable
@@ -635,7 +1042,7 @@ onMounted(async () => {
             />
           </ElSelect>
         </ElFormItem>
-        <ElFormItem label="年级">
+        <ElFormItem label="年级" required>
           <ElSelect
             v-model="importForm.gradeCode"
             filterable
@@ -659,6 +1066,16 @@ onMounted(async () => {
           >
             <ElButton>选择文件</ElButton>
           </ElUpload>
+        </ElFormItem>
+        <ElFormItem label="选项">
+          <div class="flex flex-col gap-2">
+            <ElCheckbox v-model="importForm.autoDeduplicatePhone">
+              自动去重手机号
+            </ElCheckbox>
+            <ElCheckbox v-model="importForm.autoValidatePhone">
+              自动校验手机号有效性
+            </ElCheckbox>
+          </div>
         </ElFormItem>
       </ElForm>
       <template #footer>

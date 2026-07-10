@@ -2,6 +2,7 @@
 import { onMounted, reactive, ref } from 'vue';
 
 import { Page } from '@vben/common-ui';
+import { useAccessStore, useUserStore } from '@vben/stores';
 
 import {
   ElButton,
@@ -17,6 +18,8 @@ import {
 
 import { settingsApi, updateSettingsApi } from '#/api';
 
+const accessStore = useAccessStore();
+const userStore = useUserStore();
 const loading = ref(false);
 const form = reactive({
   allowRepeatAssign: false,
@@ -51,6 +54,13 @@ async function save() {
   } finally {
     loading.value = false;
   }
+}
+
+function hasSavePermission() {
+  return (
+    userStore.userRoles.includes('admin') ||
+    accessStore.accessCodes.includes('CrmSettings:update')
+  );
 }
 
 onMounted(load);
@@ -98,7 +108,12 @@ onMounted(load);
           />
         </ElFormItem>
         <ElFormItem>
-          <ElButton :loading="loading" type="primary" @click="save">
+          <ElButton
+            v-if="hasSavePermission()"
+            :loading="loading"
+            type="primary"
+            @click="save"
+          >
             保存
           </ElButton>
         </ElFormItem>

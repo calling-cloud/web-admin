@@ -18,6 +18,15 @@ const SvgWeChatIcon = createIconifyIcon('svg:wechat');
 const SvgDingDingIcon = createIconifyIcon('svg:dingding');
 const SvgTDesignIcon = createIconifyIcon('svg:tdesign-logo');
 const SvgAntdvNextLogoIcon = createIconifyIcon('svg:antdv-next-logo');
+const SvgBangDingIcon = createIconifyIcon('svg:bangding');
+const SvgChengJiaoIcon = createIconifyIcon('svg:chengjiao');
+const SvgDianHuaIcon = createIconifyIcon('svg:dianhua');
+const SvgJiangBeiIcon = createIconifyIcon('svg:jiangbei');
+const SvgSchoolIcon = createIconifyIcon('svg:school');
+const SvgTeamIcon = createIconifyIcon('svg:team');
+const SvgYuanGongIcon = createIconifyIcon('svg:yuangong');
+const SvgGouTongIcon = createIconifyIcon('svg:goutong');
+const SvgKeHuZongShuIcon = createIconifyIcon('svg:kehuzongshu');
 
 export {
   SvgAntdvLogoIcon,
@@ -26,14 +35,23 @@ export {
   SvgAvatar2Icon,
   SvgAvatar3Icon,
   SvgAvatar4Icon,
+  SvgBangDingIcon,
   SvgBellIcon,
   SvgCakeIcon,
   SvgCardIcon,
+  SvgChengJiaoIcon,
+  SvgDianHuaIcon,
   SvgDingDingIcon,
   SvgDownloadIcon,
   SvgGithubIcon,
   SvgGoogleIcon,
+  SvgGouTongIcon,
+  SvgJiangBeiIcon,
+  SvgKeHuZongShuIcon,
   SvgQQChatIcon,
+  SvgSchoolIcon,
   SvgTDesignIcon,
+  SvgTeamIcon,
   SvgWeChatIcon,
+  SvgYuanGongIcon,
 };
