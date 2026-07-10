@@ -1,7 +1,7 @@
 <script lang="ts" setup>
-import type { CrmModule } from '#/api';
+import type { CrmModule, CrmOptionModule } from '#/api';
 
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 import { Page } from '@vben/common-ui';
@@ -38,9 +38,9 @@ import {
   createApi,
   deleteApi,
   detailApi,
-  dictsApi,
   importCustomersApi,
   listApi,
+  optionsApi,
   updateApi,
 } from '#/api';
 
@@ -242,6 +242,14 @@ const configs: Record<CrmModule, any> = {
 };
 
 const config = computed(() => configs[moduleName.value]);
+const auxModulesByModule: Record<CrmModule, CrmOptionModule[]> = {
+  customers: ['dicts', 'schools', 'teams', 'employees'],
+  employees: ['teams', 'roles'],
+  menus: ['menus'],
+  roles: ['menus'],
+  schools: ['dicts'],
+  teams: ['dicts', 'schools', 'employees'],
+};
 const batchModules = new Set<CrmModule>([
   'customers',
   'employees',
@@ -263,6 +271,8 @@ const canBulkAction = computed(
 );
 const canOperate = computed(() => hasButton('update') || hasButton('delete'));
 const dialogVisible = ref(false);
+const formLoading = ref(false);
+const formSaving = ref(false);
 const importVisible = ref(false);
 const editingId = ref<number>();
 const loading = ref(false);
@@ -466,21 +476,16 @@ const scopeValue = computed({
 });
 
 async function loadAuxData() {
-  const [dictRes, schools, teams, employees, roles, menus] = await Promise.all([
-    dictsApi(),
-    listApi('schools', { page: 1, pageSize: 100 }),
-    listApi('teams', { page: 1, pageSize: 100 }),
-    listApi('employees', { page: 1, pageSize: 100 }),
-    listApi('roles', { page: 1, pageSize: 100 }),
-    listApi('menus', { page: 1, pageSize: 100 }),
-  ]);
-  dicts.grades = dictRes.grades || [];
-  dicts.schoolTypes = dictRes.schoolTypes || [];
-  dicts.schools = schools.items || [];
-  dicts.teams = teams.items || [];
-  dicts.employees = employees.items || [];
-  dicts.roles = roles.items || [];
-  dicts.menus = menus.items || [];
+  const result = await optionsApi(auxModulesByModule[moduleName.value]);
+  if (result.dicts) {
+    dicts.grades = result.dicts.grades || [];
+    dicts.schoolTypes = result.dicts.schoolTypes || [];
+  }
+  if (result.schools) dicts.schools = result.schools || [];
+  if (result.teams) dicts.teams = result.teams || [];
+  if (result.employees) dicts.employees = result.employees || [];
+  if (result.roles) dicts.roles = result.roles || [];
+  if (result.menus) dicts.menus = result.menus || [];
 }
 
 async function loadData() {
@@ -554,8 +559,18 @@ async function resetForm(row?: Record<string, any>) {
 }
 
 async function openDialog(row?: Record<string, any>) {
-  await resetForm(row);
+  editingId.value = row?.id;
   dialogVisible.value = true;
+  formLoading.value = true;
+  await nextTick();
+  try {
+    await resetForm(row);
+  } catch (error) {
+    dialogVisible.value = false;
+    throw error;
+  } finally {
+    formLoading.value = false;
+  }
 }
 
 function payload() {
@@ -595,21 +610,24 @@ function payload() {
 }
 
 async function save() {
+  if (formLoading.value || formSaving.value) return;
   await formRef.value?.validate();
+  formSaving.value = true;
   try {
     if (editingId.value) {
       await updateApi(moduleName.value, editingId.value, payload());
     } else {
       await createApi(moduleName.value, payload());
     }
+    ElMessage.success('保存成功');
+    dialogVisible.value = false;
+    await Promise.all([loadAuxData(), loadData()]);
   } catch (error) {
     if (handleCustomerScopeForbidden(error)) return;
     throw error;
+  } finally {
+    formSaving.value = false;
   }
-  ElMessage.success('保存成功');
-  dialogVisible.value = false;
-  await loadData();
-  await loadAuxData();
 }
 
 async function remove(row: Record<string, any>) {
@@ -621,8 +639,7 @@ async function remove(row: Record<string, any>) {
     throw error;
   }
   ElMessage.success('删除成功');
-  await loadData();
-  await loadAuxData();
+  await Promise.all([loadAuxData(), loadData()]);
 }
 
 async function batchRemove() {
@@ -638,8 +655,7 @@ async function batchRemove() {
   await batchDeleteApi(moduleName.value, selectedIds.value);
   ElMessage.success(`已删除${selectedIds.value.length}条`);
   selectedRows.value = [];
-  await loadData();
-  await loadAuxData();
+  await Promise.all([loadAuxData(), loadData()]);
 }
 
 async function batchSetStatus(enabled: boolean) {
@@ -651,8 +667,7 @@ async function batchSetStatus(enabled: boolean) {
   await batchStatusApi(moduleName.value, selectedIds.value, status);
   ElMessage.success(`已${enabled ? '启用' : '禁用'}${selectedIds.value.length}条`);
   selectedRows.value = [];
-  await loadData();
-  await loadAuxData();
+  await Promise.all([loadAuxData(), loadData()]);
 }
 
 function openImport() {
@@ -698,13 +713,12 @@ watch(
     query.teamId = undefined;
     query.page = 1;
     selectedRows.value = [];
-    await loadData();
+    await Promise.all([loadAuxData(), loadData()]);
   },
 );
 
 onMounted(async () => {
-  await loadAuxData();
-  await loadData();
+  await Promise.all([loadAuxData(), loadData()]);
 });
 </script>
 
@@ -889,7 +903,14 @@ onMounted(async () => {
       size="560px"
       :title="editingId ? '编辑' : '新增'"
     >
-      <ElForm ref="formRef" :model="form" label-width="110px">
+      <div v-if="formLoading" v-loading="true" style="min-height: 240px"></div>
+      <ElForm
+        v-else
+        ref="formRef"
+        v-loading="formSaving"
+        :model="form"
+        label-width="110px"
+      >
         <ElFormItem
           v-for="field in config.fields"
           :key="field.field"
@@ -1015,9 +1036,13 @@ onMounted(async () => {
         </ElFormItem>
       </ElForm>
       <template #footer>
-        <ElButton @click="dialogVisible = false">取消</ElButton>
+        <ElButton :disabled="formSaving" @click="dialogVisible = false">
+          取消
+        </ElButton>
         <ElButton
           v-if="hasButton(editingId ? 'update' : 'create')"
+          :disabled="formLoading || formSaving"
+          :loading="formSaving"
           type="primary"
           @click="save"
           >保存</ElButton

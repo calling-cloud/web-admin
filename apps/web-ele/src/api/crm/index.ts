@@ -7,6 +7,13 @@ export type CrmModule =
   | 'roles'
   | 'schools'
   | 'teams';
+export type CrmOptionModule =
+  | 'dicts'
+  | 'employees'
+  | 'menus'
+  | 'roles'
+  | 'schools'
+  | 'teams';
 
 export interface PageParams {
   gradeCode?: number;
@@ -108,6 +115,12 @@ export function dictsApi() {
   return requestClient.get<{ grades: DictItem[]; schoolTypes: DictItem[] }>(
     '/settings/dicts',
   );
+}
+
+export function optionsApi(modules: CrmOptionModule[]) {
+  return requestClient.get<Record<string, any>>('/options', {
+    params: { modules: modules.join(',') },
+  });
 }
 
 export function settingsApi() {
