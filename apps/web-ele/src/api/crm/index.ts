@@ -54,10 +54,44 @@ export interface ImportCustomersResult {
 
 export interface SettingsInput {
   allowRepeatAssign?: boolean;
+  loginCaptchaEnabled?: boolean;
   maxAssignCount?: number;
   repeatAssignContactedOnly?: boolean;
   repeatAssignIntervalHours?: number;
   repeatAssignMinIntentLevel?: number;
+}
+
+export interface ChartQueryParams {
+  endDate?: string;
+  startDate?: string;
+}
+
+export interface ChartStatusRow {
+  status: number;
+  total: number;
+}
+
+export interface ChartRankRow {
+  employeeId?: number;
+  name: string;
+  teamId?: number;
+  total: number;
+}
+
+export interface ChartTrendRow {
+  date: string;
+  total: number;
+}
+
+export interface ChartStatsResult {
+  callEmployeeRanks: ChartRankRow[];
+  callTeamRanks: ChartRankRow[];
+  callTrends: ChartTrendRow[];
+  dealEmployeeRanks: ChartRankRow[];
+  dealTeamRanks: ChartRankRow[];
+  dealTrends: ChartTrendRow[];
+  statusStats: ChartStatusRow[];
+  trends: ChartTrendRow[];
 }
 
 export function listApi(module: CrmModule, params: PageParams) {
@@ -100,14 +134,18 @@ export function captchaApi() {
   );
 }
 
+export function captchaRequiredApi() {
+  return requestClient.get<{ loginCaptchaEnabled: boolean }>(
+    '/auth/captcha-required',
+  );
+}
+
 export function overviewApi() {
   return requestClient.get<Record<string, any>>('/overview');
 }
 
-export function trendApi() {
-  return requestClient.get<Array<{ date: string; total: number }>>(
-    '/overview/trend',
-  );
+export function trendApi(params?: ChartQueryParams) {
+  return requestClient.get<ChartStatsResult>('/overview/trend', { params });
 }
 
 export function dictsApi() {

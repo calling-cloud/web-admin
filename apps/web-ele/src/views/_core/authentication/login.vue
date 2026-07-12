@@ -8,7 +8,7 @@ import { AuthenticationLogin, z } from '@vben/common-ui';
 import { $t } from '@vben/locales';
 import { cn } from '@vben/utils';
 
-import { captchaApi } from '#/api';
+import { captchaApi, captchaRequiredApi } from '#/api';
 import { useAuthStore } from '#/store';
 
 defineOptions({ name: 'Login' });
@@ -17,6 +17,7 @@ const authStore = useAuthStore();
 
 const captchaId = ref('');
 const captchaImage = ref('');
+const captchaRequired = ref(false);
 
 function normalizeCaptchaSvg(svg: string) {
   return svg
@@ -73,7 +74,7 @@ const CaptchaInput = defineComponent({
 });
 
 const formSchema = computed((): VbenFormSchema[] => {
-  return [
+  const schema: VbenFormSchema[] = [
     {
       component: 'VbenInput',
       componentProps: {
@@ -92,7 +93,9 @@ const formSchema = computed((): VbenFormSchema[] => {
       label: $t('authentication.password'),
       rules: z.string().min(1, { message: $t('authentication.passwordTip') }),
     },
-    {
+  ];
+  if (captchaRequired.value) {
+    schema.push({
       component: markRaw(CaptchaInput),
       componentProps: {
         placeholder: '请输入图片验证码',
@@ -100,13 +103,26 @@ const formSchema = computed((): VbenFormSchema[] => {
       fieldName: 'captcha',
       label: '图片验证码',
       rules: z.string().min(1, { message: '请输入图片验证码' }),
-    },
-  ];
+    });
+  }
+  return schema;
 });
 
 async function handleLogin(values: Record<string, any>) {
-  await authStore.authLogin({ ...values, captchaId: captchaId.value });
+  try {
+    await authStore.authLogin(
+      captchaRequired.value ? { ...values, captchaId: captchaId.value } : values,
+    );
+  } catch (error) {
+    if (captchaRequired.value) await refreshCaptcha();
+    throw error;
+  }
 }
+
+onMounted(async () => {
+  const data = await captchaRequiredApi();
+  captchaRequired.value = data.loginCaptchaEnabled;
+});
 </script>
 
 <template>
@@ -118,7 +134,7 @@ async function handleLogin(values: Record<string, any>) {
     :show-qrcode-login="false"
     :show-register="false"
     :show-third-party-login="false"
-    sub-title="使用账号、密码和图片验证码登录"
+    :sub-title="captchaRequired ? '使用账号、密码和图片验证码登录' : '使用账号和密码登录'"
     title="销售管理后台"
     @submit="handleLogin"
   />

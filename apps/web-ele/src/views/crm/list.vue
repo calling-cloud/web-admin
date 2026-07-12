@@ -329,6 +329,21 @@ const dicts = reactive({
   teams: [] as Record<string, any>[],
 });
 
+function resetQuery() {
+  Object.assign(query, {
+    callAtRange: [],
+    callEmployeeId: undefined,
+    callTeamId: undefined,
+    gradeCode: undefined,
+    intentLevel: undefined,
+    keyword: '',
+    page: 1,
+    schoolId: undefined,
+    status: undefined,
+    teamId: undefined,
+  });
+}
+
 function labelOf(
   options: readonly { label: string; value: number }[],
   value: any,
@@ -758,19 +773,15 @@ async function submitImport() {
   await loadData();
 }
 
+async function resetSearch() {
+  resetQuery();
+  await loadData();
+}
+
 watch(
   () => moduleName.value,
   async () => {
-    query.keyword = '';
-    query.status = undefined;
-    query.schoolId = undefined;
-    query.gradeCode = undefined;
-    query.teamId = undefined;
-    query.callEmployeeId = undefined;
-    query.callAtRange = [];
-    query.callTeamId = undefined;
-    query.intentLevel = undefined;
-    query.page = 1;
+    resetQuery();
     selectedRows.value = [];
     await Promise.all([loadAuxData(), loadData()]);
   },
@@ -910,6 +921,7 @@ onMounted(async () => {
           />
         </ElSelect>
         <ElButton type="primary" @click="loadData">查询</ElButton>
+        <ElButton @click="resetSearch">重置</ElButton>
       </div>
     </ElCard>
 

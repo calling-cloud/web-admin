@@ -23,6 +23,7 @@ const userStore = useUserStore();
 const loading = ref(false);
 const form = reactive({
   allowRepeatAssign: false,
+  loginCaptchaEnabled: true,
   maxAssignCount: 3,
   repeatAssignContactedOnly: false,
   repeatAssignIntervalHours: 24,
@@ -42,6 +43,7 @@ async function load() {
   Object.assign(form, {
     ...data,
     allowRepeatAssign: !!data.allowRepeatAssign,
+    loginCaptchaEnabled: !!data.loginCaptchaEnabled,
     repeatAssignContactedOnly: !!data.repeatAssignContactedOnly,
   });
 }
@@ -70,6 +72,9 @@ onMounted(load);
   <Page title="系统设置">
     <ElCard>
       <ElForm :model="form" label-width="190px" style="max-width: 680px">
+        <ElFormItem label="启用验证码登录">
+          <ElSwitch v-model="form.loginCaptchaEnabled" />
+        </ElFormItem>
         <ElFormItem label="允许重复分配客户">
           <ElSwitch v-model="form.allowRepeatAssign" />
         </ElFormItem>
