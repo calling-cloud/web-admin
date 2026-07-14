@@ -61,8 +61,7 @@ async function save() {
 
 function hasSavePermission() {
   return (
-    userStore.userRoles.includes('admin') ||
-    accessStore.accessCodes.includes('CrmSettings:update')
+    userStore.userRoles.includes('admin') || accessStore.accessCodes.includes('CrmSettings:update')
   );
 }
 
@@ -73,17 +72,16 @@ onMounted(load);
   <Page title="系统设置">
     <ElCard>
       <ElForm :model="form" label-width="190px" style="max-width: 680px">
+        <div class="title">系统安全</div>
         <ElFormItem label="启用验证码登录">
           <ElSwitch v-model="form.loginCaptchaEnabled" />
         </ElFormItem>
+        <div class="title">客户分配</div>
         <ElFormItem label="允许重复分配客户">
           <ElSwitch v-model="form.allowRepeatAssign" />
         </ElFormItem>
         <ElFormItem label="只分配给联系过的员工">
-          <ElSwitch
-            v-model="form.repeatAssignContactedOnly"
-            :disabled="!form.allowRepeatAssign"
-          />
+          <ElSwitch v-model="form.repeatAssignContactedOnly" :disabled="!form.allowRepeatAssign" />
         </ElFormItem>
         <ElFormItem label="最低重复分配意向度">
           <ElSelect
@@ -114,12 +112,7 @@ onMounted(load);
           />
         </ElFormItem>
         <ElFormItem>
-          <ElButton
-            v-if="hasSavePermission()"
-            :loading="loading"
-            type="primary"
-            @click="save"
-          >
+          <ElButton v-if="hasSavePermission()" :loading="loading" type="primary" @click="save">
             保存
           </ElButton>
         </ElFormItem>
@@ -127,3 +120,24 @@ onMounted(load);
     </ElCard>
   </Page>
 </template>
+
+<style lang="scss" scoped>
+.title {
+  font-size: 16px;
+  height: 20px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding-left: 12px;
+  margin: 12px;
+  &::after {
+    position: absolute;
+    inset: 0;
+    display: block;
+    content: '';
+    width: 4px;
+    height: 100%;
+    background-color: var(--el-color-primary);
+  }
+}
+</style>

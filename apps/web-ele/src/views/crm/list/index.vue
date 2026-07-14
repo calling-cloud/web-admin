@@ -64,17 +64,19 @@ const buttonActionLabels: Record<string, string> = {
   batchDelete: '批量删除',
   create: '新增',
   delete: '删除',
+  detail: '详情',
   import: '导入',
   update: '编辑',
 };
 const buttonActionsByMenuKey: Record<string, string[]> = {
   CrmSettings: ['update'],
-  customers: ['create', 'update', 'delete', 'batchDelete', 'import'],
-  employees: ['create', 'update', 'delete', 'batchDelete'],
-  menus: ['create', 'update', 'delete', 'batchDelete'],
-  roles: ['create', 'update', 'delete', 'batchDelete'],
-  schools: ['create', 'update', 'delete', 'batchDelete'],
-  teams: ['create', 'update', 'delete', 'batchDelete'],
+  'call-records': ['detail'],
+  customers: ['detail', 'create', 'update', 'delete', 'batchDelete', 'import'],
+  employees: ['detail', 'create', 'update', 'delete', 'batchDelete'],
+  menus: ['detail', 'create', 'update', 'delete', 'batchDelete'],
+  roles: ['detail', 'create', 'update', 'delete', 'batchDelete'],
+  schools: ['detail', 'create', 'update', 'delete', 'batchDelete'],
+  teams: ['detail', 'create', 'update', 'delete', 'batchDelete'],
 };
 const callIntentOptions = [
   { label: '未知', value: 0 },
@@ -86,6 +88,18 @@ const callIntentOptions = [
 ];
 const configs: Record<CrmModule, any> = {
   'call-records': {
+    detailField: 'customerName',
+    detailFields: [
+      { field: 'customerName', label: '客户姓名' },
+      { field: 'customerPhone', label: '联系电话' },
+      { field: 'callEmployeeName', label: '通话员工' },
+      { field: 'callTeamName', label: '所属团队' },
+      { field: 'intentLevel', label: '意向度', type: 'intentLevel' },
+      { field: 'callAt', label: '通话时间', type: 'date' },
+      { field: 'durationSeconds', label: '时长(秒)', type: 'duration' },
+      { field: 'recordingUrl', label: '通话录音', type: 'audio' },
+      { field: 'remark', label: '备注' },
+    ],
     editable: false,
     fields: [],
     filters: ['callAtRange', 'callEmployeeId', 'callTeamId', 'intentLevel'],
@@ -98,11 +112,12 @@ const configs: Record<CrmModule, any> = {
       { field: 'intentLevel', label: '意向度', type: 'intentLevel' },
       { field: 'callAt', label: '通话时间', type: 'date' },
       { field: 'durationSeconds', label: '时长(秒)', type: 'duration' },
-      { field: 'recordingUrl', label: '录音地址', type: 'link' },
+      { field: 'recordingUrl', label: '通话录音', type: 'audio' },
       { field: 'remark', label: '备注' },
     ],
   },
   customers: {
+    detailField: 'customerName',
     title: '客户管理',
     fields: [
       { field: 'customerName', label: '客户姓名', required: true },
@@ -132,6 +147,22 @@ const configs: Record<CrmModule, any> = {
     ],
   },
   employees: {
+    detailField: 'realName',
+    detailFields: [
+      { field: 'username', label: '登录用户名' },
+      { field: 'realName', label: '员工姓名' },
+      { field: 'phone', label: '手机号' },
+      {
+        field: 'gender',
+        label: '性别',
+        options: genderOptions,
+        type: 'select',
+      },
+      { field: 'roleId', label: '系统角色', type: 'role' },
+      { field: 'isAdmin', label: '后台登录', type: 'bool' },
+      { field: 'avatarUrl', label: '头像URL' },
+      { field: 'lastLoginAt', label: '最后登录', type: 'date' },
+    ],
     title: '员工管理',
     fields: [
       { field: 'username', label: '登录用户名', required: true },
@@ -164,6 +195,7 @@ const configs: Record<CrmModule, any> = {
     ],
   },
   menus: {
+    detailField: 'title',
     title: '菜单管理',
     fields: [
       { field: 'parentId', label: '上级菜单', type: 'menu' },
@@ -187,6 +219,11 @@ const configs: Record<CrmModule, any> = {
     ],
   },
   roles: {
+    detailField: 'roleName',
+    detailFields: [
+      { field: 'roleCode', label: '角色编码' },
+      { field: 'roleName', label: '角色名称' },
+    ],
     title: '角色管理',
     fields: [
       { field: 'roleCode', label: '角色编码', required: true },
@@ -209,6 +246,7 @@ const configs: Record<CrmModule, any> = {
     ],
   },
   schools: {
+    detailField: 'schoolName',
     title: '学校管理',
     fields: [
       { field: 'schoolName', label: '学校名称', required: true },
@@ -235,6 +273,7 @@ const configs: Record<CrmModule, any> = {
     ],
   },
   teams: {
+    detailField: 'teamName',
     title: '团队管理',
     fields: [
       { field: 'teamName', label: '团队名称', required: true },
@@ -289,6 +328,9 @@ const canBulkAction = computed(
 const canOperate = computed(
   () => !readOnly.value && (hasButton('update') || hasButton('delete')),
 );
+const audioUrl = ref('');
+const audioVisible = ref(false);
+const drawerMode = ref<'create' | 'detail' | 'edit'>('create');
 const dialogVisible = ref(false);
 const formLoading = ref(false);
 const formSaving = ref(false);
@@ -310,6 +352,15 @@ const importForm = reactive({
 });
 const selectedIds = computed(() =>
   selectedRows.value.map((row) => Number(row.id)).filter(Boolean),
+);
+const detailMode = computed(() => drawerMode.value === 'detail');
+const drawerFields = computed(() =>
+  detailMode.value
+    ? (config.value.detailFields ?? config.value.fields)
+    : config.value.fields,
+);
+const drawerTitle = computed(() =>
+  detailMode.value ? '详情' : editingId.value ? '编辑' : '新增',
 );
 const query = reactive<Record<string, any>>({
   callEmployeeId: undefined,
@@ -364,6 +415,11 @@ function fmt(value: any, type?: string) {
   return value;
 }
 
+function openAudio(url: string) {
+  audioUrl.value = url;
+  audioVisible.value = true;
+}
+
 function selectOptions(field: any) {
   if (field.options) return field.options;
   if (field.type === 'grade') {
@@ -406,6 +462,61 @@ function selectOptions(field: any) {
     }));
   }
   return [];
+}
+
+function optionLabel(field: any, value: any) {
+  if (field.type === 'menu') {
+    return (
+      dicts.menus.find((item) => String(item.id) === String(value))?.title ??
+      value
+    );
+  }
+  return (
+    selectOptions(field).find((item) => item.value === value)?.label ??
+    selectOptions(field).find((item) => String(item.value) === String(value))
+      ?.label ??
+    value
+  );
+}
+
+function detailText(field: any) {
+  const value = form[field.field];
+  if (value === undefined || value === null || value === '') return '-';
+  if (field.type === 'scopes') {
+    return Array.isArray(value) && value.length
+      ? value
+          .map((item) => {
+            const schoolName = optionLabel(
+              { type: 'school' },
+              item.schoolId,
+            );
+            const gradeName = optionLabel({ type: 'grade' }, item.gradeCode);
+            return `${schoolName} / ${gradeName}`;
+          })
+          .join('、')
+      : '-';
+  }
+  if (Array.isArray(value)) {
+    return value.length
+      ? value.map((item) => optionLabel(field, item)).join('、')
+      : '-';
+  }
+  if (
+    field.type === 'employee' ||
+    field.type === 'grade' ||
+    field.type === 'menu' ||
+    field.type === 'role' ||
+    field.type === 'school' ||
+    field.type === 'schoolType' ||
+    field.type === 'team'
+  ) {
+    return optionLabel(field, value);
+  }
+  if (field.type === 'datetime') return fmt(value, 'date');
+  if (field.type === 'select' && field.options) {
+    return labelOf(field.options, value);
+  }
+  return fmt(value, field.type);
 }
 
 function menuTreeOptions(disableId?: number) {
@@ -618,13 +729,14 @@ async function resetForm(row?: Record<string, any>) {
   teamScopesTouched.value = false;
   Object.keys(form).forEach((key) => delete form[key]);
   const data =
-    (moduleName.value === 'schools' ||
+    (detailMode.value ||
+      moduleName.value === 'schools' ||
       moduleName.value === 'teams' ||
       moduleName.value === 'roles') &&
     row?.id
       ? await detailApi(moduleName.value, row.id)
       : row;
-  for (const field of config.value.fields) {
+  for (const field of drawerFields.value) {
     const value = data?.[field.field];
     if (field.type === 'switch') {
       form[field.field] = value === true || value === 1 || value === '1';
@@ -642,7 +754,25 @@ async function resetForm(row?: Record<string, any>) {
 }
 
 async function openDialog(row?: Record<string, any>) {
+  drawerMode.value = row ? 'edit' : 'create';
   editingId.value = row?.id;
+  dialogVisible.value = true;
+  formLoading.value = true;
+  await nextTick();
+  try {
+    await resetForm(row);
+  } catch (error) {
+    dialogVisible.value = false;
+    throw error;
+  } finally {
+    formLoading.value = false;
+  }
+}
+
+async function openDetail(row: Record<string, any>) {
+  if (!row?.id || !hasButton('detail')) return;
+  drawerMode.value = 'detail';
+  editingId.value = row.id;
   dialogVisible.value = true;
   formLoading.value = true;
   await nextTick();
@@ -968,7 +1098,19 @@ onMounted(async () => {
           min-width="120"
         >
           <template #default="{ row }">
-            <div v-if="column.type === 'tags'" class="flex flex-wrap gap-1">
+            <ElButton
+              v-if="
+                column.field === config.detailField &&
+                row[column.field] &&
+                hasButton('detail')
+              "
+              link
+              type="primary"
+              @click="openDetail(row)"
+            >
+              {{ fmt(row[column.field], column.type) }}
+            </ElButton>
+            <div v-else-if="column.type === 'tags'" class="flex flex-wrap gap-1">
               <ElTag
                 v-for="item in row[column.field] || []"
                 :key="item.id || item.realName"
@@ -985,6 +1127,14 @@ onMounted(async () => {
             >
               查看
             </a>
+            <div
+              v-else-if="column.type === 'audio' && row[column.field]"
+              class="crm-audio-cell"
+            >
+              <ElButton link type="primary" @click="openAudio(row[column.field])">
+                查看
+              </ElButton>
+            </div>
             <span v-else>{{ fmt(row[column.field], column.type) }}</span>
           </template>
         </ElTableColumn>
@@ -1021,11 +1171,11 @@ onMounted(async () => {
     </ElCard>
 
     <ElDrawer
-      v-if="!readOnly"
+      v-if="!readOnly || detailMode"
       v-model="dialogVisible"
       direction="rtl"
       size="560px"
-      :title="editingId ? '编辑' : '新增'"
+      :title="drawerTitle"
     >
       <div v-if="formLoading" v-loading="true" style="min-height: 240px"></div>
       <ElForm
@@ -1036,14 +1186,25 @@ onMounted(async () => {
         label-width="110px"
       >
         <ElFormItem
-          v-for="field in config.fields"
+          v-for="field in drawerFields"
           :key="field.field"
           :label="field.label"
           :prop="field.field"
-          :rules="fieldRules(field)"
+          :rules="detailMode ? undefined : fieldRules(field)"
         >
+          <ElButton
+            v-if="detailMode && field.type === 'audio' && form[field.field]"
+            link
+            type="primary"
+            @click="openAudio(form[field.field])"
+          >
+            查看
+          </ElButton>
+          <span v-else-if="detailMode" class="crm-detail-value">
+            {{ detailText(field) }}
+          </span>
           <ElTreeSelect
-            v-if="field.type === 'buttons'"
+            v-else-if="field.type === 'buttons'"
             v-model="form[field.field]"
             clearable
             collapse-tags
@@ -1137,10 +1298,10 @@ onMounted(async () => {
       </ElForm>
       <template #footer>
         <ElButton :disabled="formSaving" @click="dialogVisible = false">
-          取消
+          {{ detailMode ? '关闭' : '取消' }}
         </ElButton>
         <ElButton
-          v-if="hasButton(editingId ? 'update' : 'create')"
+          v-if="!detailMode && hasButton(editingId ? 'update' : 'create')"
           :disabled="formLoading || formSaving"
           :loading="formSaving"
           type="primary"
@@ -1149,6 +1310,21 @@ onMounted(async () => {
         >
       </template>
     </ElDrawer>
+
+    <ElDialog
+      v-model="audioVisible"
+      title="通话录音"
+      width="520px"
+      @closed="audioUrl = ''"
+    >
+      <audio
+        v-if="audioUrl"
+        class="crm-audio-player"
+        :src="audioUrl"
+        controls
+        preload="none"
+      ></audio>
+    </ElDialog>
 
     <ElDialog v-if="!readOnly" v-model="importVisible" title="导入客户" width="520px">
       <ElForm :model="importForm" label-width="90px">
@@ -1251,6 +1427,19 @@ onMounted(async () => {
 .crm-table-card :deep(.el-table) {
   flex: 1;
   min-height: 0;
+}
+
+.crm-audio-cell {
+  display: flex;
+  align-items: center;
+}
+
+.crm-audio-player {
+  width: 100%;
+}
+
+.crm-detail-value {
+  word-break: break-word;
 }
 
 @media (max-width: 768px) {

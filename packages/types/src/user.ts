@@ -13,6 +13,16 @@ interface UserInfo extends BasicUserInfo {
   homePath: string;
 
   /**
+   * 手机号
+   */
+  phone?: string;
+
+  /**
+   * 角色名称
+   */
+  roleName?: string;
+
+  /**
    * accessToken
    */
   token: string;

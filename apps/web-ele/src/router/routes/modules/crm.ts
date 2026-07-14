@@ -11,7 +11,7 @@ const routes: RouteRecordRaw[] = [
     path: '/crm',
     children: [
       {
-        component: () => import('#/views/crm/list.vue'),
+        component: () => import('#/views/crm/list/index.vue'),
         meta: {
           crmModule: 'customers',
           icon: 'lucide:users',
@@ -21,7 +21,7 @@ const routes: RouteRecordRaw[] = [
         path: 'customers',
       },
       {
-        component: () => import('#/views/crm/list.vue'),
+        component: () => import('#/views/crm/list/index.vue'),
         meta: {
           crmModule: 'call-records',
           icon: 'lucide:phone-call',
@@ -31,7 +31,7 @@ const routes: RouteRecordRaw[] = [
         path: 'call-records',
       },
       {
-        component: () => import('#/views/crm/list.vue'),
+        component: () => import('#/views/crm/list/index.vue'),
         meta: {
           crmModule: 'schools',
           icon: 'lucide:school',
@@ -41,7 +41,7 @@ const routes: RouteRecordRaw[] = [
         path: 'schools',
       },
       {
-        component: () => import('#/views/crm/list.vue'),
+        component: () => import('#/views/crm/list/index.vue'),
         meta: {
           crmModule: 'teams',
           icon: 'lucide:network',
@@ -51,7 +51,7 @@ const routes: RouteRecordRaw[] = [
         path: 'teams',
       },
       {
-        component: () => import('#/views/crm/list.vue'),
+        component: () => import('#/views/crm/list/index.vue'),
         meta: {
           crmModule: 'employees',
           icon: 'lucide:user-round-cog',
@@ -63,7 +63,7 @@ const routes: RouteRecordRaw[] = [
     ],
   },
   {
-    component: () => import('#/views/crm/settings.vue'),
+    component: () => import('#/views/crm/settings/index.vue'),
     meta: {
       icon: 'lucide:settings',
       order: 2,
@@ -82,7 +82,7 @@ const routes: RouteRecordRaw[] = [
     path: '/system',
     children: [
       {
-        component: () => import('#/views/crm/list.vue'),
+        component: () => import('#/views/crm/list/index.vue'),
         meta: {
           crmModule: 'roles',
           icon: 'lucide:shield-check',
@@ -92,7 +92,7 @@ const routes: RouteRecordRaw[] = [
         path: 'roles',
       },
       {
-        component: () => import('#/views/crm/list.vue'),
+        component: () => import('#/views/crm/list/index.vue'),
         meta: {
           crmModule: 'menus',
           icon: 'lucide:menu',

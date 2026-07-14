@@ -27,6 +27,10 @@ export async function loginApi(data: AuthApi.LoginParams) {
   return requestClient.post<AuthApi.LoginResult>('/auth/login', data);
 }
 
+export async function getPublicKeyApi() {
+  return requestClient.get<{ publicKey: string }>('/auth/public-key');
+}
+
 /**
  * 刷新accessToken
  */

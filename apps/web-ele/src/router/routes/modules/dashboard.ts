@@ -6,7 +6,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/overview',
     name: 'Overview',
-    component: () => import('#/views/crm/overview.vue'),
+    component: () => import('#/views/crm/overview/index.vue'),
     meta: {
       affixTab: true,
       icon: 'lucide:layout-dashboard',

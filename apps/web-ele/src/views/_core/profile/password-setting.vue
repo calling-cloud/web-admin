@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import type { VbenFormSchema } from '#/adapter/form';
 
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 import { ProfilePasswordSetting, z } from '@vben/common-ui';
 
 import { ElMessage } from 'element-plus';
+
+import { changePasswordApi } from '#/api';
+import { encryptSensitiveText } from '#/utils/sensitive-crypto';
+
+const profilePasswordSettingRef = ref();
 
 const formSchema = computed((): VbenFormSchema[] => {
   return [
@@ -50,13 +55,19 @@ const formSchema = computed((): VbenFormSchema[] => {
   ];
 });
 
-function handleSubmit() {
+async function handleSubmit(values: Record<string, string>) {
+  await changePasswordApi({
+    newPassword: await encryptSensitiveText(values.newPassword ?? ''),
+    oldPassword: await encryptSensitiveText(values.oldPassword ?? ''),
+  });
+  await profilePasswordSettingRef.value?.getFormApi().resetForm();
   ElMessage.success('密码修改成功');
 }
 </script>
 <template>
   <ProfilePasswordSetting
-    class="w-1/3"
+    ref="profilePasswordSettingRef"
+    class="max-w-xl"
     :form-schema="formSchema"
     @submit="handleSubmit"
   />

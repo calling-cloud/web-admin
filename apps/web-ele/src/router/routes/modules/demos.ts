@@ -28,7 +28,7 @@ const routes: RouteRecordRaw[] = [
         },
         name: 'BasicForm',
         path: 'form',
-        component: () => import('#/views/demos/form/basic.vue'),
+        component: () => import('#/views/demos/form/index.vue'),
       },
     ],
   },
