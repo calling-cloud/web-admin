@@ -44,6 +44,7 @@
     "ali-oss": "^6.23.0",
     "dayjs": "catalog:",
     "element-plus": "catalog:",
+    "node-forge": "^1.4.0",
     "pinia": "catalog:",
     "vue": "catalog:",
     "vue-draggable-plus": "^0.6.1",

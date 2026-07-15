@@ -92,6 +92,7 @@ const configs: Record<CrmModule, any> = {
     detailFields: [
       { field: 'customerName', label: '客户姓名' },
       { field: 'customerPhone', label: '联系电话' },
+      { field: 'customerStatus', label: '客户状态', type: 'customerStatus' },
       { field: 'callEmployeeName', label: '通话员工' },
       { field: 'callTeamName', label: '所属团队' },
       { field: 'intentLevel', label: '意向度', type: 'intentLevel' },
@@ -102,11 +103,18 @@ const configs: Record<CrmModule, any> = {
     ],
     editable: false,
     fields: [],
-    filters: ['callAtRange', 'callEmployeeId', 'callTeamId', 'intentLevel'],
+    filters: [
+      'callAtRange',
+      'callEmployeeId',
+      'callTeamId',
+      'intentLevel',
+      'status',
+    ],
     title: '通话记录',
     table: [
       { field: 'customerName', label: '客户姓名' },
       { field: 'customerPhone', label: '联系电话' },
+      { field: 'customerStatus', label: '客户状态', type: 'customerStatus' },
       { field: 'callEmployeeName', label: '通话员工' },
       { field: 'callTeamName', label: '所属团队' },
       { field: 'intentLevel', label: '意向度', type: 'intentLevel' },

@@ -1,11 +1,11 @@
 {
-  "name": "ss crm web",
-  "version": "0.1.0",
+  "name": "telephone-crm",
+  "version": "1.0.0",
   "private": true,
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "build": "pnpm run build --filter=@vben/web-ele",
+    "build": "pnpm -F @vben/web-ele run build",
     "check": "pnpm run check:dep && pnpm run check:type",
     "check:dep": "vsh check-dep",
     "check:type": "turbo run typecheck",
