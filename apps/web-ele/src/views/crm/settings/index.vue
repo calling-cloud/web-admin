@@ -9,6 +9,7 @@ import {
   ElCard,
   ElForm,
   ElFormItem,
+  ElInput,
   ElInputNumber,
   ElMessage,
   ElOption,
@@ -20,14 +21,21 @@ import { settingsApi, updateSettingsApi } from '#/api';
 
 const accessStore = useAccessStore();
 const userStore = useUserStore();
+const canSave = ref(false);
 const loading = ref(false);
 const form = reactive({
   allowRepeatAssign: false,
+  appLoginTtlDays: 7,
+  dealNotifyEnabled: false,
+  dingtalkPushEnabled: false,
+  dingtalkWebhookUrl: '',
   loginCaptchaEnabled: true,
   maxAssignCount: 3,
   repeatAssignContactedOnly: false,
   repeatAssignIntervalHours: 24,
   repeatAssignMinIntentLevel: 3,
+  wecomPushEnabled: false,
+  wecomWebhookUrl: '',
 });
 
 const intentOptions = [
@@ -40,16 +48,24 @@ const intentOptions = [
 ];
 
 async function load() {
-  const data = await settingsApi();
-  Object.assign(form, {
-    ...data,
-    allowRepeatAssign: !!data.allowRepeatAssign,
-    loginCaptchaEnabled: !!data.loginCaptchaEnabled,
-    repeatAssignContactedOnly: !!data.repeatAssignContactedOnly,
-  });
+  canSave.value = false;
+  try {
+    const data = await settingsApi();
+    Object.assign(form, {
+      ...data,
+      allowRepeatAssign: !!data.allowRepeatAssign,
+      dealNotifyEnabled: !!data.dealNotifyEnabled,
+      dingtalkPushEnabled: !!data.dingtalkPushEnabled,
+      loginCaptchaEnabled: !!data.loginCaptchaEnabled,
+      repeatAssignContactedOnly: !!data.repeatAssignContactedOnly,
+      wecomPushEnabled: !!data.wecomPushEnabled,
+    });
+    canSave.value = true;
+  } catch {}
 }
 
 async function save() {
+  if (!canSave.value) return;
   loading.value = true;
   try {
     await updateSettingsApi(form);
@@ -75,6 +91,29 @@ onMounted(load);
         <div class="title">系统安全</div>
         <ElFormItem label="启用验证码登录">
           <ElSwitch v-model="form.loginCaptchaEnabled" />
+        </ElFormItem>
+        <ElFormItem label="App登录有效期（天）">
+          <ElInputNumber v-model="form.appLoginTtlDays" :min="1" />
+        </ElFormItem>
+        <div class="title">推送设置</div>
+        <ElFormItem label="企微推送">
+          <ElSwitch v-model="form.wecomPushEnabled" />
+        </ElFormItem>
+        <ElFormItem v-if="form.wecomPushEnabled" label="企微webHook地址">
+          <ElInput v-model="form.wecomWebhookUrl" clearable placeholder="请输入企微webHook地址" />
+        </ElFormItem>
+        <ElFormItem label="钉钉推送">
+          <ElSwitch v-model="form.dingtalkPushEnabled" />
+        </ElFormItem>
+        <ElFormItem v-if="form.dingtalkPushEnabled" label="钉钉webHook地址">
+          <ElInput
+            v-model="form.dingtalkWebhookUrl"
+            clearable
+            placeholder="请输入钉钉webHook地址"
+          />
+        </ElFormItem>
+        <ElFormItem label="成交喜报推送">
+          <ElSwitch v-model="form.dealNotifyEnabled" />
         </ElFormItem>
         <div class="title">客户分配</div>
         <ElFormItem label="允许重复分配客户">
@@ -112,7 +151,13 @@ onMounted(load);
           />
         </ElFormItem>
         <ElFormItem>
-          <ElButton v-if="hasSavePermission()" :loading="loading" type="primary" @click="save">
+          <ElButton
+            v-if="hasSavePermission()"
+            :disabled="!canSave"
+            :loading="loading"
+            type="primary"
+            @click="save"
+          >
             保存
           </ElButton>
         </ElFormItem>

@@ -54,6 +54,7 @@ export interface ImportCustomersResult {
 
 export interface SettingsInput {
   allowRepeatAssign?: boolean;
+  appLoginTtlDays?: number;
   loginCaptchaEnabled?: boolean;
   maxAssignCount?: number;
   repeatAssignContactedOnly?: boolean;
