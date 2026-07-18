@@ -55,11 +55,23 @@ export interface ImportCustomersResult {
 export interface SettingsInput {
   allowRepeatAssign?: boolean;
   appLoginTtlDays?: number;
+  appUpdateApkUrl?: string;
+  appUpdateChangelog?: string;
+  appUpdateForce?: boolean;
+  appUpdateMinVersionCode?: number;
+  appUpdateSha256?: string;
+  appUpdateVersionCode?: number;
+  appUpdateVersionName?: string;
+  dealNotifyEnabled?: boolean;
+  dingtalkPushEnabled?: boolean;
+  dingtalkWebhookUrl?: string;
   loginCaptchaEnabled?: boolean;
   maxAssignCount?: number;
   repeatAssignContactedOnly?: boolean;
   repeatAssignIntervalHours?: number;
   repeatAssignMinIntentLevel?: number;
+  wecomPushEnabled?: boolean;
+  wecomWebhookUrl?: string;
 }
 
 export interface ChartQueryParams {

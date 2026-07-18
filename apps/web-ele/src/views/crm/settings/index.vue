@@ -26,6 +26,13 @@ const loading = ref(false);
 const form = reactive({
   allowRepeatAssign: false,
   appLoginTtlDays: 7,
+  appUpdateApkUrl: '',
+  appUpdateChangelog: '',
+  appUpdateForce: false,
+  appUpdateMinVersionCode: 0,
+  appUpdateSha256: '',
+  appUpdateVersionCode: 0,
+  appUpdateVersionName: '',
   dealNotifyEnabled: false,
   dingtalkPushEnabled: false,
   dingtalkWebhookUrl: '',
@@ -54,6 +61,7 @@ async function load() {
     Object.assign(form, {
       ...data,
       allowRepeatAssign: !!data.allowRepeatAssign,
+      appUpdateForce: !!data.appUpdateForce,
       dealNotifyEnabled: !!data.dealNotifyEnabled,
       dingtalkPushEnabled: !!data.dingtalkPushEnabled,
       loginCaptchaEnabled: !!data.loginCaptchaEnabled,
@@ -94,6 +102,34 @@ onMounted(load);
         </ElFormItem>
         <ElFormItem label="App登录有效期（天）">
           <ElInputNumber v-model="form.appLoginTtlDays" :min="1" />
+        </ElFormItem>
+        <div class="title">App更新</div>
+        <ElFormItem label="最新整数版本号">
+          <ElInputNumber v-model="form.appUpdateVersionCode" :min="0" />
+        </ElFormItem>
+        <ElFormItem label="展示版本名">
+          <ElInput v-model="form.appUpdateVersionName" clearable placeholder="例如 1.2" />
+        </ElFormItem>
+        <ElFormItem label="最低可用版本号">
+          <ElInputNumber v-model="form.appUpdateMinVersionCode" :min="0" />
+        </ElFormItem>
+        <ElFormItem label="APK下载地址">
+          <ElInput v-model="form.appUpdateApkUrl" clearable placeholder="请输入 APK 下载地址" />
+        </ElFormItem>
+        <ElFormItem label="APK SHA256">
+          <ElInput v-model="form.appUpdateSha256" clearable placeholder="为空则跳过校验" />
+        </ElFormItem>
+        <ElFormItem label="强制更新">
+          <ElSwitch v-model="form.appUpdateForce" />
+        </ElFormItem>
+        <ElFormItem label="更新日志">
+          <ElInput
+            v-model="form.appUpdateChangelog"
+            :rows="3"
+            clearable
+            placeholder="多行可用 \\n 分隔"
+            type="textarea"
+          />
         </ElFormItem>
         <div class="title">推送设置</div>
         <ElFormItem label="企微推送">

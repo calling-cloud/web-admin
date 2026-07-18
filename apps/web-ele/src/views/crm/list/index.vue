@@ -24,6 +24,8 @@ import {
   ElMessageBox,
   ElOption,
   ElPagination,
+  ElRadioButton,
+  ElRadioGroup,
   ElSelect,
   ElSwitch,
   ElTable,
@@ -59,6 +61,10 @@ const genderOptions = [
   { label: '未知', value: 0 },
   { label: '男', value: 1 },
   { label: '女', value: 2 },
+];
+const employeeStatusOptions = [
+  { label: '启用', value: 1 },
+  { label: '停用', value: 2 },
 ];
 const buttonActionLabels: Record<string, string> = {
   batchDelete: '批量删除',
@@ -168,6 +174,8 @@ const configs: Record<CrmModule, any> = {
       },
       { field: 'roleId', label: '系统角色', type: 'role' },
       { field: 'isAdmin', label: '后台登录', type: 'bool' },
+      { field: 'status', label: '状态', type: 'employeeStatus' },
+      { field: 'teams', label: '所在团队', type: 'tags' },
       { field: 'avatarUrl', label: '头像URL' },
       { field: 'lastLoginAt', label: '最后登录', type: 'date' },
     ],
@@ -190,6 +198,13 @@ const configs: Record<CrmModule, any> = {
       },
       { field: 'roleId', label: '系统角色', type: 'role' },
       { field: 'isAdmin', label: '后台登录', type: 'switch' },
+      {
+        defaultValue: 1,
+        field: 'status',
+        label: '状态',
+        options: employeeStatusOptions,
+        type: 'radio',
+      },
       { field: 'avatarUrl', label: '头像URL' },
     ],
     filters: ['teamId'],
@@ -199,6 +214,7 @@ const configs: Record<CrmModule, any> = {
       { field: 'phone', label: '手机号' },
       { field: 'roleName', label: '角色' },
       { field: 'isAdmin', label: '后台登录', type: 'bool' },
+      { field: 'status', label: '状态', type: 'employeeStatus' },
       { field: 'lastLoginAt', label: '最后登录', type: 'date' },
     ],
   },
@@ -417,6 +433,7 @@ function fmt(value: any, type?: string) {
   if (value === undefined || value === null || value === '') return '-';
   if (type === 'customerStatus') return labelOf(customerStatusOptions, value);
   if (type === 'duration') return `${value} 秒`;
+  if (type === 'employeeStatus') return labelOf(employeeStatusOptions, value);
   if (type === 'intentLevel') return labelOf(callIntentOptions, value);
   if (type === 'bool') return value ? '是' : '否';
   if (type === 'date') return new Date(value).toLocaleString();
@@ -428,7 +445,7 @@ function openAudio(url: string) {
   audioVisible.value = true;
 }
 
-function selectOptions(field: any) {
+function selectOptions(field: any): Array<{ label: string; value: any }> {
   if (field.options) return field.options;
   if (field.type === 'grade') {
     return dicts.grades.map((item) => ({
@@ -501,6 +518,16 @@ function detailText(field: any) {
             const gradeName = optionLabel({ type: 'grade' }, item.gradeCode);
             return `${schoolName} / ${gradeName}`;
           })
+          .join('、')
+      : '-';
+  }
+  if (field.type === 'tags') {
+    return Array.isArray(value) && value.length
+      ? value
+          .map(
+            (item) =>
+              item.teamName || item.realName || item.name || item.label || item,
+          )
           .join('、')
       : '-';
   }
@@ -605,6 +632,7 @@ function fieldRules(field: any): FormItemRule[] | undefined {
       field.type === 'role' ||
       field.type === 'employee' ||
       field.type === 'menu' ||
+      field.type === 'radio' ||
       field.type === 'buttons'
         ? 'change'
         : 'blur',
@@ -747,11 +775,16 @@ async function resetForm(row?: Record<string, any>) {
   for (const field of drawerFields.value) {
     const value = data?.[field.field];
     if (field.type === 'switch') {
+      if ('activeValue' in field || 'inactiveValue' in field) {
+        form[field.field] = value ?? field.activeValue;
+        continue;
+      }
       form[field.field] = value === true || value === 1 || value === '1';
       continue;
     }
     form[field.field] =
       value ??
+      field.defaultValue ??
       (field.multiple || field.type === 'scopes'
         ? []
         : undefined);
@@ -1261,7 +1294,26 @@ onMounted(async () => {
               :value="item.value"
             />
           </ElSelect>
-          <ElSwitch v-else-if="field.type === 'switch'" v-model="form[field.field]" />
+          <ElRadioGroup
+            v-else-if="field.type === 'radio'"
+            v-model="form[field.field]"
+          >
+            <ElRadioButton
+              v-for="item in selectOptions(field)"
+              :key="item.value"
+              :label="item.value"
+            >
+              {{ item.label }}
+            </ElRadioButton>
+          </ElRadioGroup>
+          <ElSwitch
+            v-else-if="field.type === 'switch'"
+            v-model="form[field.field]"
+            :active-text="field.activeText"
+            :active-value="field.activeValue ?? true"
+            :inactive-text="field.inactiveText"
+            :inactive-value="field.inactiveValue ?? false"
+          />
           <ElInputNumber
             v-else-if="field.type === 'number'"
             v-model="form[field.field]"
