@@ -41,7 +41,9 @@ export interface PageResult<T = Record<string, any>> {
 
 export interface DictItem {
   gradeCode?: number;
+  gradeCount?: number;
   gradeName?: string;
+  sortOrder?: number;
   typeCode?: number;
   typeName?: string;
 }
@@ -164,6 +166,50 @@ export function trendApi(params?: ChartQueryParams) {
 export function dictsApi() {
   return requestClient.get<{ grades: DictItem[]; schoolTypes: DictItem[] }>(
     '/settings/dicts',
+  );
+}
+
+export function schoolTypeListApi() {
+  return requestClient.get<DictItem[]>('/grade-management/types');
+}
+
+export function createSchoolTypeApi(data: Record<string, any>) {
+  return requestClient.post('/grade-management/types', data);
+}
+
+export function updateSchoolTypeApi(id: number, data: Record<string, any>) {
+  return requestClient.put(`/grade-management/types/${id}`, data);
+}
+
+export function deleteSchoolTypeApi(id: number) {
+  return requestClient.delete(`/grade-management/types/${id}`);
+}
+
+export function gradeListApi(typeCode: number, params?: PageParams) {
+  return requestClient.get<PageResult<DictItem>>(
+    `/grade-management/types/${typeCode}/grades`,
+    { params },
+  );
+}
+
+export function createGradeApi(typeCode: number, data: Record<string, any>) {
+  return requestClient.post(`/grade-management/types/${typeCode}/grades`, data);
+}
+
+export function updateGradeApi(
+  typeCode: number,
+  id: number,
+  data: Record<string, any>,
+) {
+  return requestClient.put(
+    `/grade-management/types/${typeCode}/grades/${id}`,
+    data,
+  );
+}
+
+export function deleteGradeApi(typeCode: number, id: number) {
+  return requestClient.delete(
+    `/grade-management/types/${typeCode}/grades/${id}`,
   );
 }
 

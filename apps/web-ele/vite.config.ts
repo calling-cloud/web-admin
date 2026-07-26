@@ -17,6 +17,10 @@ export default defineConfig(async () => {
             changeOrigin: true,
             target: 'http://localhost:3000',
             ws: true,
+            rewrite(path) {
+              console.log(`server proxy: ${path} ====> ${this.target}${path}`);
+              return path;
+            },
           },
         },
       },

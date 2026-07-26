@@ -135,7 +135,7 @@ onMounted(async () => {
     :show-register="false"
     :show-third-party-login="false"
     :sub-title="captchaRequired ? '使用账号、密码和图片验证码登录' : '使用账号和密码登录'"
-    title="销售管理后台"
+    title="呼客云后台系统"
     @submit="handleLogin"
   />
 </template>
