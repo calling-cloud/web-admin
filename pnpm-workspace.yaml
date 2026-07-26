@@ -147,6 +147,7 @@ catalog:
   medium-zoom: ^1.1.0
   naive-ui: ^2.44.1
   nitropack: ^2.13.4
+  node-forge: ^1.4.0
   nprogress: ^0.2.0
   ora: ^9.4.0
   oxfmt: ^0.55.0

@@ -13,7 +13,10 @@ export const overridesPreferences = defineOverridesPreferences({
   app: {
     accessMode: 'backend',
     defaultHomePath: '/overview',
-    name: import.meta.env.VITE_APP_TITLE,
+    name: '呼客云',
   },
   copyright: appCopyrightPreferences,
+  logo: {
+    source: '/hukeyun.ico.svg',
+  },
 });

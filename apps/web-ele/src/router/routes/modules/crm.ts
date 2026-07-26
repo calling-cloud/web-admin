@@ -41,6 +41,15 @@ const routes: RouteRecordRaw[] = [
         path: 'schools',
       },
       {
+        component: () => import('#/views/crm/grades/index.vue'),
+        meta: {
+          icon: 'lucide:graduation-cap',
+          title: '年级管理',
+        },
+        name: 'CrmGrades',
+        path: 'grades',
+      },
+      {
         component: () => import('#/views/crm/list/index.vue'),
         meta: {
           crmModule: 'teams',

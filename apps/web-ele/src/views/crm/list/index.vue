@@ -76,6 +76,7 @@ const buttonActionLabels: Record<string, string> = {
 };
 const buttonActionsByMenuKey: Record<string, string[]> = {
   CrmSettings: ['update'],
+  CrmGrades: ['create', 'update', 'delete'],
   'call-records': ['detail'],
   customers: ['detail', 'create', 'update', 'delete', 'batchDelete', 'import'],
   employees: ['detail', 'create', 'update', 'delete', 'batchDelete'],
@@ -98,6 +99,8 @@ const configs: Record<CrmModule, any> = {
     detailFields: [
       { field: 'customerName', label: '客户姓名' },
       { field: 'customerPhone', label: '联系电话' },
+      { field: 'schoolName', label: '学校' },
+      { field: 'gradeName', label: '年级' },
       { field: 'customerStatus', label: '客户状态', type: 'customerStatus' },
       { field: 'callEmployeeName', label: '通话员工' },
       { field: 'callTeamName', label: '所属团队' },
@@ -113,6 +116,8 @@ const configs: Record<CrmModule, any> = {
       'callAtRange',
       'callEmployeeId',
       'callTeamId',
+      'schoolId',
+      'gradeCode',
       'intentLevel',
       'status',
     ],
@@ -120,6 +125,8 @@ const configs: Record<CrmModule, any> = {
     table: [
       { field: 'customerName', label: '客户姓名' },
       { field: 'customerPhone', label: '联系电话' },
+      { field: 'schoolName', label: '学校' },
+      { field: 'gradeName', label: '年级' },
       { field: 'customerStatus', label: '客户状态', type: 'customerStatus' },
       { field: 'callEmployeeName', label: '通话员工' },
       { field: 'callTeamName', label: '所属团队' },
@@ -322,7 +329,7 @@ const configs: Record<CrmModule, any> = {
 
 const config = computed(() => configs[moduleName.value]);
 const auxModulesByModule: Record<CrmModule, CrmOptionModule[]> = {
-  'call-records': ['employees', 'teams'],
+  'call-records': ['dicts', 'schools', 'employees', 'teams'],
   customers: ['dicts', 'schools', 'teams', 'employees'],
   employees: ['teams', 'roles'],
   menus: ['menus'],

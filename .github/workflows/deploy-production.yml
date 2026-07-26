@@ -31,6 +31,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Validate deployment secrets
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          missing=0
+
+          for name in \
+            SERVER_HOST \
+            SERVER_USER \
+            SERVER_PORT \
+            DEPLOY_WEB_PATH \
+            DEPLOY_SSH_KEY \
+            DEPLOY_KNOWN_HOSTS
+          do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing or inaccessible GitHub Actions secret: $name"
+              missing=1
+            fi
+          done
+
+          exit "$missing"
+
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -58,12 +81,6 @@ jobs:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
-          test -n "$SERVER_HOST"
-          test -n "$SERVER_USER"
-          test -n "$DEPLOY_WEB_PATH"
-          test -n "$DEPLOY_SSH_KEY"
-          test -n "$DEPLOY_KNOWN_HOSTS"
-
           install -m 700 -d ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
