@@ -145,15 +145,15 @@ const configs: Record<CrmModule, any> = {
       { field: 'phone', label: '联系电话', required: true },
       { field: 'schoolId', label: '所属学校', required: true, type: 'school' },
       { field: 'gradeCode', label: '年级', required: true, type: 'grade' },
-      { field: 'assignedTeamId', label: '分配团队', type: 'team' },
-      { field: 'assignedEmployeeId', label: '分配员工', type: 'employee' },
-      {
-        field: 'status',
-        label: '状态',
-        options: customerStatusOptions,
-        type: 'select',
-      },
-      { field: 'dealAt', label: '成交时间', type: 'datetime' },
+      // { field: 'assignedTeamId', label: '分配团队', type: 'team' },
+      // { field: 'assignedEmployeeId', label: '分配员工', type: 'employee' },
+      // {
+      //   field: 'status',
+      //   label: '状态',
+      //   options: customerStatusOptions,
+      //   type: 'select',
+      // },
+      // { field: 'dealAt', label: '成交时间', type: 'datetime' },
       { field: 'remark', label: '备注', type: 'textarea' },
     ],
     filters: ['status', 'schoolId', 'gradeCode'],
@@ -349,16 +349,10 @@ const readOnly = computed(() => config.value.editable === false);
 const canBatch = computed(() => batchModules.has(moduleName.value));
 const currentMenuKey = computed(
   () =>
-    menuKey(
-      dicts.menus.find((item) => item.moduleKey === moduleName.value),
-    ) || moduleName.value,
+    menuKey(dicts.menus.find((item) => item.moduleKey === moduleName.value)) || moduleName.value,
 );
-const canBulkAction = computed(
-  () => !readOnly.value && canBatch.value && hasButton('batchDelete'),
-);
-const canOperate = computed(
-  () => !readOnly.value && (hasButton('update') || hasButton('delete')),
-);
+const canBulkAction = computed(() => !readOnly.value && canBatch.value && hasButton('batchDelete'));
+const canOperate = computed(() => !readOnly.value && (hasButton('update') || hasButton('delete')));
 const audioUrl = ref('');
 const audioVisible = ref(false);
 const drawerMode = ref<'create' | 'detail' | 'edit'>('create');
@@ -381,18 +375,12 @@ const importForm = reactive({
   gradeCode: undefined,
   schoolId: undefined,
 });
-const selectedIds = computed(() =>
-  selectedRows.value.map((row) => Number(row.id)).filter(Boolean),
-);
+const selectedIds = computed(() => selectedRows.value.map((row) => Number(row.id)).filter(Boolean));
 const detailMode = computed(() => drawerMode.value === 'detail');
 const drawerFields = computed(() =>
-  detailMode.value
-    ? (config.value.detailFields ?? config.value.fields)
-    : config.value.fields,
+  detailMode.value ? (config.value.detailFields ?? config.value.fields) : config.value.fields,
 );
-const drawerTitle = computed(() =>
-  detailMode.value ? '详情' : editingId.value ? '编辑' : '新增',
-);
+const drawerTitle = computed(() => (detailMode.value ? '详情' : editingId.value ? '编辑' : '新增'));
 const query = reactive<Record<string, any>>({
   callEmployeeId: undefined,
   callTeamId: undefined,
@@ -427,13 +415,8 @@ function resetQuery() {
   });
 }
 
-function labelOf(
-  options: readonly { label: string; value: number }[],
-  value: any,
-) {
-  return (
-    options.find((item) => item.value === Number(value))?.label || value || '-'
-  );
+function labelOf(options: readonly { label: string; value: number }[], value: any) {
+  return options.find((item) => item.value === Number(value))?.label || value || '-';
 }
 
 function fmt(value: any, type?: string) {
@@ -498,15 +481,11 @@ function selectOptions(field: any): Array<{ label: string; value: any }> {
 
 function optionLabel(field: any, value: any) {
   if (field.type === 'menu') {
-    return (
-      dicts.menus.find((item) => String(item.id) === String(value))?.title ??
-      value
-    );
+    return dicts.menus.find((item) => String(item.id) === String(value))?.title ?? value;
   }
   return (
     selectOptions(field).find((item) => item.value === value)?.label ??
-    selectOptions(field).find((item) => String(item.value) === String(value))
-      ?.label ??
+    selectOptions(field).find((item) => String(item.value) === String(value))?.label ??
     value
   );
 }
@@ -518,10 +497,7 @@ function detailText(field: any) {
     return Array.isArray(value) && value.length
       ? value
           .map((item) => {
-            const schoolName = optionLabel(
-              { type: 'school' },
-              item.schoolId,
-            );
+            const schoolName = optionLabel({ type: 'school' }, item.schoolId);
             const gradeName = optionLabel({ type: 'grade' }, item.gradeCode);
             return `${schoolName} / ${gradeName}`;
           })
@@ -531,17 +507,12 @@ function detailText(field: any) {
   if (field.type === 'tags') {
     return Array.isArray(value) && value.length
       ? value
-          .map(
-            (item) =>
-              item.teamName || item.realName || item.name || item.label || item,
-          )
+          .map((item) => item.teamName || item.realName || item.name || item.label || item)
           .join('、')
       : '-';
   }
   if (Array.isArray(value)) {
-    return value.length
-      ? value.map((item) => optionLabel(field, item)).join('、')
-      : '-';
+    return value.length ? value.map((item) => optionLabel(field, item)).join('、') : '-';
   }
   if (
     field.type === 'employee' ||
@@ -621,9 +592,7 @@ function buttonTreeOptions() {
 function fieldRules(field: any): FormItemRule[] | undefined {
   if (
     !field.required ||
-    (moduleName.value === 'employees' &&
-      editingId.value &&
-      field.field === 'password')
+    (moduleName.value === 'employees' && editingId.value && field.field === 'password')
   ) {
     return undefined;
   }
@@ -667,10 +636,7 @@ const scopeCascaderProps = { multiple: true };
 
 const schoolScopeOptions = computed(() =>
   dicts.schools.map((school) => {
-    const gradeCodes =
-      Array.isArray(school.gradeCodes) && school.gradeCodes.length > 0
-        ? school.gradeCodes
-        : dicts.grades.map((grade) => grade.gradeCode);
+    const gradeCodes = Array.isArray(school.gradeCodes) ? school.gradeCodes : [];
 
     return {
       children: dicts.grades
@@ -734,9 +700,7 @@ async function loadData() {
           : query,
     );
     rows.value =
-      moduleName.value === 'menus'
-        ? buildMenuTree(result.items || [])
-        : result.items || [];
+      moduleName.value === 'menus' ? buildMenuTree(result.items || []) : result.items || [];
     total.value = result.total || 0;
   } catch (error) {
     if (handleCustomerScopeForbidden(error)) {
@@ -790,11 +754,7 @@ async function resetForm(row?: Record<string, any>) {
       continue;
     }
     form[field.field] =
-      value ??
-      field.defaultValue ??
-      (field.multiple || field.type === 'scopes'
-        ? []
-        : undefined);
+      value ?? field.defaultValue ?? (field.multiple || field.type === 'scopes' ? [] : undefined);
   }
   if (moduleName.value === 'employees' && row) {
     form.password = undefined;
@@ -836,25 +796,15 @@ async function openDetail(row: Record<string, any>) {
 
 function payload() {
   const data = Object.fromEntries(
-    Object.entries(form).filter(
-      ([, value]) => value !== '' && value !== undefined,
-    ),
+    Object.entries(form).filter(([, value]) => value !== '' && value !== undefined),
   );
   if (moduleName.value === 'employees' && editingId.value && !data.password) {
     delete data.password;
   }
-  if (
-    moduleName.value === 'teams' &&
-    editingId.value &&
-    !teamScopesTouched.value
-  ) {
+  if (moduleName.value === 'teams' && editingId.value && !teamScopesTouched.value) {
     delete data.scopes;
   }
-  if (
-    moduleName.value === 'menus' &&
-    editingId.value &&
-    form.parentId === undefined
-  ) {
+  if (moduleName.value === 'menus' && editingId.value && form.parentId === undefined) {
     data.parentId = null;
   }
   if (
@@ -908,11 +858,9 @@ async function batchRemove() {
     ElMessage.warning('请先勾选数据');
     return;
   }
-  await ElMessageBox.confirm(
-    `确认删除选中的${selectedIds.value.length}条数据？`,
-    '提示',
-    { type: 'warning' },
-  );
+  await ElMessageBox.confirm(`确认删除选中的${selectedIds.value.length}条数据？`, '提示', {
+    type: 'warning',
+  });
   await batchDeleteApi(moduleName.value, selectedIds.value);
   ElMessage.success(`已删除${selectedIds.value.length}条`);
   selectedRows.value = [];
@@ -972,11 +920,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Page
-    :title="config.title"
-    auto-content-height
-    content-class="crm-list-content"
-  >
+  <Page :title="config.title" auto-content-height content-class="crm-list-content">
     <ElCard class="crm-search-card">
       <div class="flex flex-wrap items-center gap-3">
         <ElInput
@@ -1117,9 +1061,7 @@ onMounted(async () => {
           </ElButton>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <ElButton v-if="!readOnly && hasButton('create')" @click="openDialog()">
-            新增
-          </ElButton>
+          <ElButton v-if="!readOnly && hasButton('create')" @click="openDialog()"> 新增 </ElButton>
           <ElButton
             v-if="!readOnly && moduleName === 'customers' && hasButton('import')"
             @click="openImport"
@@ -1147,11 +1089,7 @@ onMounted(async () => {
         >
           <template #default="{ row }">
             <ElButton
-              v-if="
-                column.field === config.detailField &&
-                row[column.field] &&
-                hasButton('detail')
-              "
+              v-if="column.field === config.detailField && row[column.field] && hasButton('detail')"
               link
               type="primary"
               @click="openDetail(row)"
@@ -1175,31 +1113,18 @@ onMounted(async () => {
             >
               查看
             </a>
-            <div
-              v-else-if="column.type === 'audio' && row[column.field]"
-              class="crm-audio-cell"
-            >
-              <ElButton link type="primary" @click="openAudio(row[column.field])">
-                查看
-              </ElButton>
+            <div v-else-if="column.type === 'audio' && row[column.field]" class="crm-audio-cell">
+              <ElButton link type="primary" @click="openAudio(row[column.field])"> 查看 </ElButton>
             </div>
             <span v-else>{{ fmt(row[column.field], column.type) }}</span>
           </template>
         </ElTableColumn>
         <ElTableColumn v-if="canOperate" fixed="right" label="操作" width="150">
           <template #default="{ row }">
-            <ElButton
-              v-if="hasButton('update')"
-              link
-              type="primary"
-              @click="openDialog(row)"
+            <ElButton v-if="hasButton('update')" link type="primary" @click="openDialog(row)"
               >编辑</ElButton
             >
-            <ElButton
-              v-if="hasButton('delete')"
-              link
-              type="danger"
-              @click="remove(row)"
+            <ElButton v-if="hasButton('delete')" link type="danger" @click="remove(row)"
               >删除</ElButton
             >
           </template>
@@ -1226,13 +1151,7 @@ onMounted(async () => {
       :title="drawerTitle"
     >
       <div v-if="formLoading" v-loading="true" style="min-height: 240px"></div>
-      <ElForm
-        v-else
-        ref="formRef"
-        v-loading="formSaving"
-        :model="form"
-        label-width="110px"
-      >
+      <ElForm v-else ref="formRef" v-loading="formSaving" :model="form" label-width="110px">
         <ElFormItem
           v-for="field in drawerFields"
           :key="field.field"
@@ -1269,9 +1188,7 @@ onMounted(async () => {
             check-strictly
             clearable
             collapse-tags
-            :data="
-              menuTreeOptions(moduleName === 'menus' ? editingId : undefined)
-            "
+            :data="menuTreeOptions(moduleName === 'menus' ? editingId : undefined)"
             filterable
             :multiple="field.multiple"
             node-key="value"
@@ -1301,10 +1218,7 @@ onMounted(async () => {
               :value="item.value"
             />
           </ElSelect>
-          <ElRadioGroup
-            v-else-if="field.type === 'radio'"
-            v-model="form[field.field]"
-          >
+          <ElRadioGroup v-else-if="field.type === 'radio'" v-model="form[field.field]">
             <ElRadioButton
               v-for="item in selectOptions(field)"
               :key="item.value"
@@ -1378,12 +1292,7 @@ onMounted(async () => {
       </template>
     </ElDrawer>
 
-    <ElDialog
-      v-model="audioVisible"
-      title="通话录音"
-      width="520px"
-      @closed="audioUrl = ''"
-    >
+    <ElDialog v-model="audioVisible" title="通话录音" width="520px" @closed="audioUrl = ''">
       <audio
         v-if="audioUrl"
         class="crm-audio-player"
@@ -1437,12 +1346,8 @@ onMounted(async () => {
         </ElFormItem>
         <ElFormItem label="选项">
           <div class="flex flex-col gap-2">
-            <ElCheckbox v-model="importForm.autoDeduplicatePhone">
-              自动去重手机号
-            </ElCheckbox>
-            <ElCheckbox v-model="importForm.autoValidatePhone">
-              自动校验手机号有效性
-            </ElCheckbox>
+            <ElCheckbox v-model="importForm.autoDeduplicatePhone"> 自动去重手机号 </ElCheckbox>
+            <ElCheckbox v-model="importForm.autoValidatePhone"> 自动校验手机号有效性 </ElCheckbox>
           </div>
         </ElFormItem>
       </ElForm>
