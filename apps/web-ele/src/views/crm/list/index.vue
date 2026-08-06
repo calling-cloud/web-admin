@@ -46,6 +46,8 @@ import {
   updateApi,
 } from '#/api';
 
+import BatchAssignDialog from './components/BatchAssignDialog.vue';
+
 const route = useRoute();
 const moduleName = computed(() => route.meta.crmModule as CrmModule);
 const accessStore = useAccessStore();
@@ -57,6 +59,10 @@ const customerStatusOptions = [
   { label: '已成交', value: 3 },
   { label: '无效', value: 4 },
 ];
+const exclusiveModeOptions = [
+  { label: '长期有效', value: 1 },
+  { label: '分配N次后失效', value: 2 },
+];
 const genderOptions = [
   { label: '未知', value: 0 },
   { label: '男', value: 1 },
@@ -67,6 +73,7 @@ const employeeStatusOptions = [
   { label: '停用', value: 2 },
 ];
 const buttonActionLabels: Record<string, string> = {
+  batchAssign: '批量分配',
   batchDelete: '批量删除',
   create: '新增',
   delete: '删除',
@@ -78,7 +85,7 @@ const buttonActionsByMenuKey: Record<string, string[]> = {
   CrmSettings: ['update'],
   CrmGrades: ['create', 'update', 'delete'],
   'call-records': ['detail'],
-  customers: ['detail', 'create', 'update', 'delete', 'batchDelete', 'import'],
+  customers: ['detail', 'create', 'update', 'delete', 'batchDelete', 'batchAssign', 'import'],
   employees: ['detail', 'create', 'update', 'delete', 'batchDelete'],
   menus: ['detail', 'create', 'update', 'delete', 'batchDelete'],
   roles: ['detail', 'create', 'update', 'delete', 'batchDelete'],
@@ -139,32 +146,70 @@ const configs: Record<CrmModule, any> = {
   },
   customers: {
     detailField: 'customerName',
+    detailFields: [
+      { field: 'customerName', label: '客户姓名', required: true },
+      { field: 'phone', label: '联系电话', required: true },
+      { field: 'schoolId', label: '所属学校', required: true, type: 'school' },
+      { field: 'gradeCode', label: '年级', required: true, type: 'grade' },
+      { field: 'assignedTeamId', label: '分配团队', type: 'team' },
+      { field: 'assignedEmployeeId', label: '分配员工', type: 'employee' },
+      {
+        field: 'status',
+        label: '状态',
+        options: customerStatusOptions,
+        type: 'select',
+      },
+      { field: 'dealAt', label: '成交时间', type: 'datetime' },
+      { field: 'exclusiveEmployeeId', label: '专属员工', type: 'employee' },
+      {
+        field: 'exclusiveMode',
+        label: '专属模式',
+        options: exclusiveModeOptions,
+        type: 'select',
+      },
+      {
+        field: 'maxExclusiveAssignCount',
+        label: '最大专属分配次数',
+        min: 1,
+        type: 'number',
+      },
+
+      { field: 'remark', label: '备注', type: 'textarea' },
+    ],
     title: '客户管理',
     fields: [
       { field: 'customerName', label: '客户姓名', required: true },
       { field: 'phone', label: '联系电话', required: true },
       { field: 'schoolId', label: '所属学校', required: true, type: 'school' },
       { field: 'gradeCode', label: '年级', required: true, type: 'grade' },
-      // { field: 'assignedTeamId', label: '分配团队', type: 'team' },
-      // { field: 'assignedEmployeeId', label: '分配员工', type: 'employee' },
-      // {
-      //   field: 'status',
-      //   label: '状态',
-      //   options: customerStatusOptions,
-      //   type: 'select',
-      // },
-      // { field: 'dealAt', label: '成交时间', type: 'datetime' },
-      { field: 'remark', label: '备注', type: 'textarea' },
     ],
-    filters: ['status', 'schoolId', 'gradeCode'],
+    filters: ['status', 'schoolId', 'gradeCode', 'exclusiveEmployeeId', 'exclusiveMode'],
     table: [
       { field: 'customerName', label: '客户姓名' },
       { field: 'phone', label: '联系电话' },
-      { field: 'schoolName', label: '所属学校' },
+      { field: 'schoolName', label: '所属学校', minWidth: '120px' },
       { field: 'gradeName', label: '年级' },
       { field: 'assignedCount', label: '分配次数' },
+      { field: 'exclusiveEmployeeId', label: '专属员工', type: 'employee' },
+      {
+        field: 'exclusiveMode',
+        label: '专属模式',
+        options: exclusiveModeOptions,
+        type: 'select',
+      },
+      {
+        field: 'maxExclusiveAssignCount',
+        label: '最大专属分配次数',
+        minWidth: '140px',
+      },
+      { field: 'remark', label: '备注' },
       { field: 'status', label: '状态', type: 'customerStatus' },
-      { field: 'updatedAt', label: '更新时间', type: 'date' },
+      {
+        field: 'updatedAt',
+        label: '更新时间',
+        type: 'date',
+        minWidth: '140px',
+      },
     ],
   },
   employees: {
@@ -351,7 +396,13 @@ const currentMenuKey = computed(
   () =>
     menuKey(dicts.menus.find((item) => item.moduleKey === moduleName.value)) || moduleName.value,
 );
-const canBulkAction = computed(() => !readOnly.value && canBatch.value && hasButton('batchDelete'));
+const canBatchAssign = computed(
+  () => !readOnly.value && moduleName.value === 'customers' && hasButton('batchAssign'),
+);
+const canBatchDelete = computed(
+  () => !readOnly.value && canBatch.value && hasButton('batchDelete'),
+);
+const canSelectRows = computed(() => canBatchAssign.value || canBatchDelete.value);
 const canOperate = computed(() => !readOnly.value && (hasButton('update') || hasButton('delete')));
 const audioUrl = ref('');
 const audioVisible = ref(false);
@@ -359,6 +410,7 @@ const drawerMode = ref<'create' | 'detail' | 'edit'>('create');
 const dialogVisible = ref(false);
 const formLoading = ref(false);
 const formSaving = ref(false);
+const batchAssignVisible = ref(false);
 const importVisible = ref(false);
 const editingId = ref<number>();
 const loading = ref(false);
@@ -373,9 +425,16 @@ const importForm = reactive({
   autoDeduplicatePhone: true,
   autoValidatePhone: true,
   gradeCode: undefined,
+  remark: '',
   schoolId: undefined,
 });
 const selectedIds = computed(() => selectedRows.value.map((row) => Number(row.id)).filter(Boolean));
+const selectedAssignableCustomerIds = computed(() =>
+  selectedRows.value
+    .filter((row) => Number(row.status) === 1)
+    .map((row) => Number(row.id))
+    .filter(Boolean),
+);
 const detailMode = computed(() => drawerMode.value === 'detail');
 const drawerFields = computed(() =>
   detailMode.value ? (config.value.detailFields ?? config.value.fields) : config.value.fields,
@@ -406,6 +465,8 @@ function resetQuery() {
     callEmployeeId: undefined,
     callTeamId: undefined,
     gradeCode: undefined,
+    exclusiveEmployeeId: undefined,
+    exclusiveMode: undefined,
     intentLevel: undefined,
     keyword: '',
     page: 1,
@@ -529,6 +590,13 @@ function detailText(field: any) {
   if (field.type === 'select' && field.options) {
     return labelOf(field.options, value);
   }
+  return fmt(value, field.type);
+}
+
+function tableText(field: any, row: Record<string, any>) {
+  const value = row[field.field];
+  if (value === undefined || value === null || value === '') return '-';
+  if (field.type === 'employee' || field.type === 'select') return optionLabel(field, value);
   return fmt(value, field.type);
 }
 
@@ -867,9 +935,22 @@ async function batchRemove() {
   await Promise.all([loadAuxData(), loadData()]);
 }
 
+function openBatchAssign() {
+  if (selectedRows.value.length && !selectedAssignableCustomerIds.value.length) {
+    ElMessage.warning('已勾选客户中没有待分配客户');
+  }
+  batchAssignVisible.value = true;
+}
+
+async function handleBatchAssignSuccess() {
+  selectedRows.value = [];
+  await loadData();
+}
+
 function openImport() {
   importForm.autoDeduplicatePhone = true;
   importForm.autoValidatePhone = true;
+  importForm.remark = '';
   importVisible.value = true;
 }
 
@@ -883,6 +964,7 @@ async function submitImport() {
   data.append('file', file);
   data.append('schoolId', String(importForm.schoolId));
   data.append('gradeCode', String(importForm.gradeCode));
+  data.append('remark', importForm.remark.trim());
   data.append('autoDeduplicatePhone', String(importForm.autoDeduplicatePhone));
   data.append('autoValidatePhone', String(importForm.autoValidatePhone));
   let result;
@@ -975,6 +1057,35 @@ onMounted(async () => {
           />
         </ElSelect>
         <ElSelect
+          v-if="config.filters.includes('exclusiveEmployeeId')"
+          v-model="query.exclusiveEmployeeId"
+          clearable
+          filterable
+          placeholder="专属员工"
+          style="width: 160px"
+        >
+          <ElOption
+            v-for="item in selectOptions({ type: 'employee' })"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </ElSelect>
+        <ElSelect
+          v-if="config.filters.includes('exclusiveMode')"
+          v-model="query.exclusiveMode"
+          clearable
+          placeholder="专属模式"
+          style="width: 160px"
+        >
+          <ElOption
+            v-for="item in exclusiveModeOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </ElSelect>
+        <ElSelect
           v-if="config.filters.includes('teamId')"
           v-model="query.teamId"
           clearable
@@ -1052,7 +1163,7 @@ onMounted(async () => {
       <div class="crm-table-toolbar">
         <div class="flex flex-wrap items-center gap-2">
           <ElButton
-            v-if="canBulkAction"
+            v-if="canBatchDelete"
             :disabled="!selectedIds.length"
             type="danger"
             @click="batchRemove"
@@ -1068,6 +1179,9 @@ onMounted(async () => {
           >
             导入
           </ElButton>
+          <ElButton v-if="canBatchAssign" type="primary" @click="openBatchAssign">
+            批量分配
+          </ElButton>
         </div>
       </div>
       <ElTable
@@ -1079,13 +1193,13 @@ onMounted(async () => {
         :tree-props="{ children: 'children' }"
         @selection-change="selectedRows = $event"
       >
-        <ElTableColumn v-if="canBulkAction" type="selection" width="48" />
+        <ElTableColumn v-if="canSelectRows" type="selection" width="48" />
         <ElTableColumn label="ID" prop="id" width="90" />
         <ElTableColumn
           v-for="column in config.table"
           :key="column.field"
           :label="column.label"
-          min-width="120"
+          v-bind="column"
         >
           <template #default="{ row }">
             <ElButton
@@ -1116,7 +1230,7 @@ onMounted(async () => {
             <div v-else-if="column.type === 'audio' && row[column.field]" class="crm-audio-cell">
               <ElButton link type="primary" @click="openAudio(row[column.field])"> 查看 </ElButton>
             </div>
-            <span v-else>{{ fmt(row[column.field], column.type) }}</span>
+            <span v-else>{{ tableText(column, row) }}</span>
           </template>
         </ElTableColumn>
         <ElTableColumn v-if="canOperate" fixed="right" label="操作" width="150">
@@ -1147,17 +1261,18 @@ onMounted(async () => {
       v-if="!readOnly || detailMode"
       v-model="dialogVisible"
       direction="rtl"
-      size="560px"
+      size="620px"
       :title="drawerTitle"
     >
       <div v-if="formLoading" v-loading="true" style="min-height: 240px"></div>
-      <ElForm v-else ref="formRef" v-loading="formSaving" :model="form" label-width="110px">
+      <ElForm v-else ref="formRef" v-loading="formSaving" :model="form" label-width="136px">
         <ElFormItem
           v-for="field in drawerFields"
           :key="field.field"
           :label="field.label"
           :prop="field.field"
           :rules="detailMode ? undefined : fieldRules(field)"
+          v-bind="field?.options || {}"
         >
           <ElButton
             v-if="detailMode && field.type === 'audio' && form[field.field]"
@@ -1238,6 +1353,7 @@ onMounted(async () => {
           <ElInputNumber
             v-else-if="field.type === 'number'"
             v-model="form[field.field]"
+            :min="field.min"
             style="width: 100%"
           />
           <ElCascader
@@ -1287,8 +1403,9 @@ onMounted(async () => {
           :loading="formSaving"
           type="primary"
           @click="save"
-          >保存</ElButton
         >
+          保存
+        </ElButton>
       </template>
     </ElDrawer>
 
@@ -1301,6 +1418,17 @@ onMounted(async () => {
         preload="none"
       ></audio>
     </ElDialog>
+
+    <BatchAssignDialog
+      v-if="canBatchAssign"
+      v-model:visible="batchAssignVisible"
+      :employees="dicts.employees"
+      :grades="dicts.grades"
+      :initial-customer-ids="selectedAssignableCustomerIds"
+      :schools="dicts.schools"
+      :teams="dicts.teams"
+      @success="handleBatchAssignSuccess"
+    />
 
     <ElDialog v-if="!readOnly" v-model="importVisible" title="导入客户" width="520px">
       <ElForm :model="importForm" label-width="90px">
@@ -1343,6 +1471,15 @@ onMounted(async () => {
           >
             <ElButton>选择文件</ElButton>
           </ElUpload>
+        </ElFormItem>
+        <ElFormItem label="备注">
+          <ElInput
+            v-model="importForm.remark"
+            maxlength="500"
+            placeholder="请输入导入客户备注"
+            show-word-limit
+            type="textarea"
+          />
         </ElFormItem>
         <ElFormItem label="选项">
           <div class="flex flex-col gap-2">
