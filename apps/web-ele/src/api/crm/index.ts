@@ -22,6 +22,8 @@ export interface PageParams {
   callEmployeeId?: number;
   callTeamId?: number;
   customerId?: number;
+  exclusiveEmployeeId?: number;
+  exclusiveMode?: number;
   gradeCode?: number;
   keyword?: string;
   intentLevel?: number;
@@ -52,6 +54,25 @@ export interface ImportCustomersResult {
   duplicatePhones: Record<string, any>[];
   imported: Record<string, any>[];
   invalidPhones: Record<string, any>[];
+}
+
+export interface BatchAssignCustomersInput {
+  assignmentMode: 1 | 2 | 3;
+  assignmentWeights?: { employeeId: number; weight: number }[];
+  customerIds: number[];
+  employeeIds: number[];
+  exclusiveMode: 1 | 2;
+  maxExclusiveAssignCount?: null | number;
+  teamId: number;
+}
+
+export interface BatchAssignCustomersResult {
+  affected: number;
+  assignments: {
+    count: number;
+    customerIds: number[];
+    employeeId: number;
+  }[];
 }
 
 export interface SettingsInput {
@@ -135,6 +156,13 @@ export function deleteApi(module: CrmModule, id: number) {
 
 export function batchDeleteApi(module: CrmModule, ids: number[]) {
   return requestClient.post(`/${module}/batch/delete`, { ids });
+}
+
+export function batchAssignCustomersApi(data: BatchAssignCustomersInput) {
+  return requestClient.post<BatchAssignCustomersResult>(
+    '/customers/batch/assign',
+    data,
+  );
 }
 
 export function importCustomersApi(data: FormData) {
