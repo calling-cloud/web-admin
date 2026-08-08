@@ -164,6 +164,10 @@ const overviewItems = computed(() =>
     value: Number(overviewStats.value[card.field] ?? 0),
   })),
 );
+const appliedQuickRange = computed(() =>
+  QUICK_RANGES.find((days) => sameRange(appliedRange.value, createRange(days))),
+);
+const appliedRangeText = computed(() => `${appliedRange.value[0]} 至 ${appliedRange.value[1]}`);
 
 function startOfToday() {
   const value = new Date();
@@ -518,12 +522,16 @@ onMounted(async () => {
 
     <div class="mt-4 flex items-center justify-between gap-4">
       <div class="text-base font-medium">图表统计</div>
-      <ElButton plain @click="openFilter">
-        <span class="inline-flex items-center gap-1">
-          <IconifyIcon class="size-4" icon="lucide:filter" />
-          筛选
-        </span>
-      </ElButton>
+      <div class="flex flex-wrap items-center justify-end gap-2 text-sm text-muted-foreground">
+        <span v-if="appliedQuickRange"> 近{{ appliedQuickRange }}天 · </span>
+        <span>{{ appliedRangeText }}</span>
+        <ElButton plain @click="openFilter">
+          <span class="inline-flex items-center gap-1">
+            <IconifyIcon class="size-4" icon="lucide:filter" />
+            筛选
+          </span>
+        </ElButton>
+      </div>
     </div>
 
     <div class="mt-4 grid gap-4 lg:grid-cols-2">

@@ -100,6 +100,7 @@ const callIntentOptions = [
   { label: '高', value: 4 },
   { label: '强烈', value: 5 },
 ];
+type SchoolGradeValue = [number, number];
 const configs: Record<CrmModule, any> = {
   'call-records': {
     detailField: 'customerName',
@@ -180,8 +181,7 @@ const configs: Record<CrmModule, any> = {
     fields: [
       { field: 'customerName', label: '客户姓名', required: true },
       { field: 'phone', label: '联系电话', required: true },
-      { field: 'schoolId', label: '所属学校', required: true, type: 'school' },
-      { field: 'gradeCode', label: '年级', required: true, type: 'grade' },
+      { field: 'schoolGrade', label: '所属学校/年级', required: true, type: 'schoolGrade' },
     ],
     filters: ['status', 'schoolId', 'gradeCode', 'exclusiveEmployeeId', 'exclusiveMode'],
     table: [
@@ -424,9 +424,8 @@ const form = reactive<Record<string, any>>({});
 const importForm = reactive({
   autoDeduplicatePhone: true,
   autoValidatePhone: true,
-  gradeCode: undefined,
   remark: '',
-  schoolId: undefined,
+  schoolGrade: [] as SchoolGradeValue | [],
 });
 const selectedIds = computed(() => selectedRows.value.map((row) => Number(row.id)).filter(Boolean));
 const selectedAssignableCustomerIds = computed(() =>
@@ -670,6 +669,7 @@ function fieldRules(field: any): FormItemRule[] | undefined {
     trigger:
       field.type === 'select' ||
       field.type === 'school' ||
+      field.type === 'schoolGrade' ||
       field.type === 'schoolType' ||
       field.type === 'grade' ||
       field.type === 'team' ||
@@ -682,6 +682,7 @@ function fieldRules(field: any): FormItemRule[] | undefined {
         : 'blur',
   };
   if (field.multiple) rule.type = 'array';
+  if (field.type === 'schoolGrade') rule.type = 'array';
   return [rule];
 }
 
@@ -701,6 +702,7 @@ function buildMenuTree(items: Record<string, any>[]) {
 }
 
 const scopeCascaderProps = { multiple: true };
+const schoolGradeCascaderProps = { emitPath: true };
 
 const schoolScopeOptions = computed(() =>
   dicts.schools.map((school) => {
@@ -717,6 +719,12 @@ const schoolScopeOptions = computed(() =>
       value: school.id,
     };
   }),
+);
+
+const schoolGradeOptions = computed(() =>
+  schoolScopeOptions.value.filter(
+    (item) => Array.isArray(item.children) && item.children.length > 0,
+  ),
 );
 
 const scopeValue = computed({
@@ -813,6 +821,11 @@ async function resetForm(row?: Record<string, any>) {
       : row;
   for (const field of drawerFields.value) {
     const value = data?.[field.field];
+    if (field.type === 'schoolGrade') {
+      form[field.field] =
+        data?.schoolId && data?.gradeCode ? [Number(data.schoolId), Number(data.gradeCode)] : [];
+      continue;
+    }
     if (field.type === 'switch') {
       if ('activeValue' in field || 'inactiveValue' in field) {
         form[field.field] = value ?? field.activeValue;
@@ -866,6 +879,12 @@ function payload() {
   const data = Object.fromEntries(
     Object.entries(form).filter(([, value]) => value !== '' && value !== undefined),
   );
+  if (moduleName.value === 'customers' && Array.isArray(data.schoolGrade)) {
+    const [schoolId, gradeCode] = data.schoolGrade;
+    data.schoolId = schoolId;
+    data.gradeCode = gradeCode;
+    delete data.schoolGrade;
+  }
   if (moduleName.value === 'employees' && editingId.value && !data.password) {
     delete data.password;
   }
@@ -951,19 +970,21 @@ function openImport() {
   importForm.autoDeduplicatePhone = true;
   importForm.autoValidatePhone = true;
   importForm.remark = '';
+  importForm.schoolGrade = [];
   importVisible.value = true;
 }
 
 async function submitImport() {
   const file = fileList.value[0]?.raw;
-  if (!file || !importForm.schoolId || !importForm.gradeCode) {
+  const [schoolId, gradeCode] = importForm.schoolGrade;
+  if (!file || !schoolId || !gradeCode) {
     ElMessage.warning('请选择文件、学校和年级');
     return;
   }
   const data = new FormData();
   data.append('file', file);
-  data.append('schoolId', String(importForm.schoolId));
-  data.append('gradeCode', String(importForm.gradeCode));
+  data.append('schoolId', String(schoolId));
+  data.append('gradeCode', String(gradeCode));
   data.append('remark', importForm.remark.trim());
   data.append('autoDeduplicatePhone', String(importForm.autoDeduplicatePhone));
   data.append('autoValidatePhone', String(importForm.autoValidatePhone));
@@ -1357,6 +1378,16 @@ onMounted(async () => {
             style="width: 100%"
           />
           <ElCascader
+            v-else-if="field.type === 'schoolGrade'"
+            v-model="form[field.field]"
+            :options="schoolGradeOptions"
+            :props="schoolGradeCascaderProps"
+            clearable
+            filterable
+            placeholder="请选择学校和年级"
+            style="width: 100%"
+          />
+          <ElCascader
             v-else-if="field.type === 'scopes'"
             v-model="scopeValue"
             :options="schoolScopeOptions"
@@ -1432,35 +1463,16 @@ onMounted(async () => {
 
     <ElDialog v-if="!readOnly" v-model="importVisible" title="导入客户" width="520px">
       <ElForm :model="importForm" label-width="90px">
-        <ElFormItem label="学校" required>
-          <ElSelect
-            v-model="importForm.schoolId"
+        <ElFormItem label="学校年级" required>
+          <ElCascader
+            v-model="importForm.schoolGrade"
+            :options="schoolGradeOptions"
+            :props="schoolGradeCascaderProps"
+            clearable
             filterable
-            placeholder="请选择学校"
+            placeholder="请选择学校和年级"
             style="width: 100%"
-          >
-            <ElOption
-              v-for="item in selectOptions({ type: 'school' })"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
-            />
-          </ElSelect>
-        </ElFormItem>
-        <ElFormItem label="年级" required>
-          <ElSelect
-            v-model="importForm.gradeCode"
-            filterable
-            placeholder="请选择年级"
-            style="width: 100%"
-          >
-            <ElOption
-              v-for="item in selectOptions({ type: 'grade' })"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
-            />
-          </ElSelect>
+          />
         </ElFormItem>
         <ElFormItem label="文件">
           <ElUpload
