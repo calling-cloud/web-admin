@@ -1293,7 +1293,6 @@ onMounted(async () => {
           :label="field.label"
           :prop="field.field"
           :rules="detailMode ? undefined : fieldRules(field)"
-          v-bind="field?.options || {}"
         >
           <ElButton
             v-if="detailMode && field.type === 'audio' && form[field.field]"
