@@ -75,19 +75,38 @@ const employeeStatusOptions = [
 const buttonActionLabels: Record<string, string> = {
   batchAssign: '批量分配',
   batchDelete: '批量删除',
+  batchUpdateStatus: '修改已选客户状态',
   create: '新增',
   delete: '删除',
   detail: '详情',
   import: '导入',
+  filterUpdateStatus: '按筛选条件修改全部',
+  updateStatus: '修改客户状态',
   update: '编辑',
+  view: '查看',
 };
 const buttonActionsByMenuKey: Record<string, string[]> = {
   CrmSettings: ['update'],
   CrmGrades: ['create', 'update', 'delete'],
   'call-records': ['detail'],
-  customers: ['detail', 'create', 'update', 'delete', 'batchDelete', 'batchAssign', 'import'],
+  customers: [
+    'detail',
+    'create',
+    'update',
+    'delete',
+    'batchDelete',
+    'batchAssign',
+    'import',
+  ],
+  'dial-pool': [
+    'view',
+    'updateStatus',
+    'batchUpdateStatus',
+    'filterUpdateStatus',
+  ],
   employees: ['detail', 'create', 'update', 'delete', 'batchDelete'],
   menus: ['detail', 'create', 'update', 'delete', 'batchDelete'],
+  'risk-logs': ['view'],
   roles: ['detail', 'create', 'update', 'delete', 'batchDelete'],
   schools: ['detail', 'create', 'update', 'delete', 'batchDelete'],
   teams: ['detail', 'create', 'update', 'delete', 'batchDelete'],
@@ -99,6 +118,12 @@ const callIntentOptions = [
   { label: '中', value: 3 },
   { label: '高', value: 4 },
   { label: '强烈', value: 5 },
+];
+const riskRuleOptions = [
+  { label: '短时间连续标记', value: 'STATUS_BURST' },
+  { label: '无有效通话', value: 'STATUS_WITHOUT_CALL' },
+  { label: '高于个人历史无效率', value: 'INVALID_PERSONAL_BASELINE' },
+  { label: '高于团队平均无效率', value: 'INVALID_TEAM_BASELINE' },
 ];
 type SchoolGradeValue = [number, number];
 const configs: Record<CrmModule, any> = {
@@ -145,6 +170,74 @@ const configs: Record<CrmModule, any> = {
       { field: 'remark', label: '备注' },
     ],
   },
+  'risk-logs': {
+    editable: false,
+    fields: [],
+    filters: [
+      'riskAtRange',
+      'employeeId',
+      'teamId',
+      'requestedStatus',
+      'ruleCode',
+    ],
+    title: '风险日志',
+    table: [
+      { field: 'customerName', label: '客户姓名', minWidth: '100px' },
+      { field: 'customerPhone', label: '联系电话', minWidth: '120px' },
+      { field: 'employeeName', label: '操作员工', minWidth: '100px' },
+      { field: 'teamName', label: '所属团队', minWidth: '100px' },
+      {
+        field: 'fromStatus',
+        label: '原状态',
+        type: 'customerStatus',
+        minWidth: '90px',
+      },
+      {
+        field: 'requestedStatus',
+        label: '请求状态',
+        type: 'customerStatus',
+        minWidth: '90px',
+      },
+      {
+        field: 'ruleCodes',
+        label: '命中规则',
+        type: 'riskRules',
+        minWidth: '180px',
+      },
+      {
+        field: 'evidence',
+        label: '风险依据',
+        type: 'riskEvidence',
+        minWidth: '320px',
+      },
+      {
+        field: 'autoRestoreEnabled',
+        label: '自动恢复',
+        type: 'bool',
+        minWidth: '90px',
+      },
+      {
+        field: 'riskAction',
+        label: '执行逻辑',
+        type: 'riskAction',
+        minWidth: '90px',
+      },
+      {
+        field: 'accountBanned',
+        label: '账号封禁',
+        type: 'bool',
+        minWidth: '90px',
+      },
+      { field: 'restoredCount', label: '恢复数量', minWidth: '90px' },
+      { field: 'restoreSkippedCount', label: '跳过数量', minWidth: '90px' },
+      {
+        field: 'createdAt',
+        label: '拦截时间',
+        type: 'date',
+        minWidth: '170px',
+      },
+    ],
+  },
   customers: {
     detailField: 'customerName',
     detailFields: [
@@ -181,9 +274,20 @@ const configs: Record<CrmModule, any> = {
     fields: [
       { field: 'customerName', label: '客户姓名', required: true },
       { field: 'phone', label: '联系电话', required: true },
-      { field: 'schoolGrade', label: '所属学校/年级', required: true, type: 'schoolGrade' },
+      {
+        field: 'schoolGrade',
+        label: '所属学校/年级',
+        required: true,
+        type: 'schoolGrade',
+      },
     ],
-    filters: ['status', 'schoolId', 'gradeCode', 'exclusiveEmployeeId', 'exclusiveMode'],
+    filters: [
+      'status',
+      'schoolId',
+      'gradeCode',
+      'exclusiveEmployeeId',
+      'exclusiveMode',
+    ],
     table: [
       { field: 'customerName', label: '客户姓名' },
       { field: 'phone', label: '联系电话' },
@@ -378,6 +482,7 @@ const auxModulesByModule: Record<CrmModule, CrmOptionModule[]> = {
   customers: ['dicts', 'schools', 'teams', 'employees'],
   employees: ['teams', 'roles'],
   menus: ['menus'],
+  'risk-logs': ['employees', 'teams'],
   roles: ['menus'],
   schools: ['dicts'],
   teams: ['dicts', 'schools', 'employees'],
@@ -394,16 +499,24 @@ const readOnly = computed(() => config.value.editable === false);
 const canBatch = computed(() => batchModules.has(moduleName.value));
 const currentMenuKey = computed(
   () =>
-    menuKey(dicts.menus.find((item) => item.moduleKey === moduleName.value)) || moduleName.value,
+    menuKey(dicts.menus.find((item) => item.moduleKey === moduleName.value)) ||
+    moduleName.value,
 );
 const canBatchAssign = computed(
-  () => !readOnly.value && moduleName.value === 'customers' && hasButton('batchAssign'),
+  () =>
+    !readOnly.value &&
+    moduleName.value === 'customers' &&
+    hasButton('batchAssign'),
 );
 const canBatchDelete = computed(
   () => !readOnly.value && canBatch.value && hasButton('batchDelete'),
 );
-const canSelectRows = computed(() => canBatchAssign.value || canBatchDelete.value);
-const canOperate = computed(() => !readOnly.value && (hasButton('update') || hasButton('delete')));
+const canSelectRows = computed(
+  () => canBatchAssign.value || canBatchDelete.value,
+);
+const canOperate = computed(
+  () => !readOnly.value && (hasButton('update') || hasButton('delete')),
+);
 const audioUrl = ref('');
 const audioVisible = ref(false);
 const drawerMode = ref<'create' | 'detail' | 'edit'>('create');
@@ -427,7 +540,9 @@ const importForm = reactive({
   remark: '',
   schoolGrade: [] as SchoolGradeValue | [],
 });
-const selectedIds = computed(() => selectedRows.value.map((row) => Number(row.id)).filter(Boolean));
+const selectedIds = computed(() =>
+  selectedRows.value.map((row) => Number(row.id)).filter(Boolean),
+);
 const selectedAssignableCustomerIds = computed(() =>
   selectedRows.value
     .filter((row) => Number(row.status) === 1)
@@ -436,9 +551,13 @@ const selectedAssignableCustomerIds = computed(() =>
 );
 const detailMode = computed(() => drawerMode.value === 'detail');
 const drawerFields = computed(() =>
-  detailMode.value ? (config.value.detailFields ?? config.value.fields) : config.value.fields,
+  detailMode.value
+    ? (config.value.detailFields ?? config.value.fields)
+    : config.value.fields,
 );
-const drawerTitle = computed(() => (detailMode.value ? '详情' : editingId.value ? '编辑' : '新增'));
+const drawerTitle = computed(() =>
+  detailMode.value ? '详情' : editingId.value ? '编辑' : '新增',
+);
 const query = reactive<Record<string, any>>({
   callEmployeeId: undefined,
   callTeamId: undefined,
@@ -447,6 +566,7 @@ const query = reactive<Record<string, any>>({
   keyword: '',
   page: 1,
   pageSize: 20,
+  riskAtRange: [],
 });
 const dicts = reactive({
   employees: [] as Record<string, any>[],
@@ -469,14 +589,23 @@ function resetQuery() {
     intentLevel: undefined,
     keyword: '',
     page: 1,
+    employeeId: undefined,
+    requestedStatus: undefined,
+    riskAtRange: [],
+    ruleCode: undefined,
     schoolId: undefined,
     status: undefined,
     teamId: undefined,
   });
 }
 
-function labelOf(options: readonly { label: string; value: number }[], value: any) {
-  return options.find((item) => item.value === Number(value))?.label || value || '-';
+function labelOf(
+  options: readonly { label: string; value: number }[],
+  value: any,
+) {
+  return (
+    options.find((item) => item.value === Number(value))?.label || value || '-'
+  );
 }
 
 function fmt(value: any, type?: string) {
@@ -485,9 +614,46 @@ function fmt(value: any, type?: string) {
   if (type === 'duration') return `${value} 秒`;
   if (type === 'employeeStatus') return labelOf(employeeStatusOptions, value);
   if (type === 'intentLevel') return labelOf(callIntentOptions, value);
+  if (type === 'riskRules') {
+    const codes = Array.isArray(value) ? value : String(value).split(',');
+    return codes
+      .map(
+        (code) =>
+          riskRuleOptions.find((item) => item.value === code)?.label || code,
+      )
+      .join('、');
+  }
+  if (type === 'riskEvidence') return riskEvidenceText(value);
+  if (type === 'riskAction')
+    return Number(value) === 2 ? '账号封禁' : '禁止操作';
   if (type === 'bool') return value ? '是' : '否';
   if (type === 'date') return new Date(value).toLocaleString();
   return value;
+}
+
+function riskEvidenceText(value: any) {
+  if (!Array.isArray(value)) return '-';
+  return value
+    .map((item) => {
+      const evidence = item?.evidence || {};
+      if (item?.ruleCode === 'STATUS_BURST') {
+        return `${evidence.windowMinutes}分钟内标记${evidence.actualCount}位，阈值${evidence.threshold}位`;
+      }
+      if (item?.ruleCode === 'STATUS_WITHOUT_CALL') {
+        return `${evidence.withinHours}小时内无不少于${evidence.minCallSeconds}秒的有效通话`;
+      }
+      if (item?.ruleCode === 'INVALID_PERSONAL_BASELINE') {
+        return `当日无效率${evidence.todayRatePercent}%（${evidence.todayHandled}次），历史${evidence.historyRatePercent}%（${evidence.historyHandled}次）`;
+      }
+      if (item?.ruleCode === 'INVALID_TEAM_BASELINE') {
+        return `当日无效率${evidence.todayRatePercent}%（${evidence.todayHandled}次），团队${evidence.teamRatePercent}%（${evidence.teamHandled}次）`;
+      }
+      return (
+        riskRuleOptions.find((option) => option.value === item?.ruleCode)
+          ?.label || '未知风险'
+      );
+    })
+    .join('；');
 }
 
 function openAudio(url: string) {
@@ -541,11 +707,15 @@ function selectOptions(field: any): Array<{ label: string; value: any }> {
 
 function optionLabel(field: any, value: any) {
   if (field.type === 'menu') {
-    return dicts.menus.find((item) => String(item.id) === String(value))?.title ?? value;
+    return (
+      dicts.menus.find((item) => String(item.id) === String(value))?.title ??
+      value
+    );
   }
   return (
     selectOptions(field).find((item) => item.value === value)?.label ??
-    selectOptions(field).find((item) => String(item.value) === String(value))?.label ??
+    selectOptions(field).find((item) => String(item.value) === String(value))
+      ?.label ??
     value
   );
 }
@@ -567,12 +737,17 @@ function detailText(field: any) {
   if (field.type === 'tags') {
     return Array.isArray(value) && value.length
       ? value
-          .map((item) => item.teamName || item.realName || item.name || item.label || item)
+          .map(
+            (item) =>
+              item.teamName || item.realName || item.name || item.label || item,
+          )
           .join('、')
       : '-';
   }
   if (Array.isArray(value)) {
-    return value.length ? value.map((item) => optionLabel(field, item)).join('、') : '-';
+    return value.length
+      ? value.map((item) => optionLabel(field, item)).join('、')
+      : '-';
   }
   if (
     field.type === 'employee' ||
@@ -595,7 +770,8 @@ function detailText(field: any) {
 function tableText(field: any, row: Record<string, any>) {
   const value = row[field.field];
   if (value === undefined || value === null || value === '') return '-';
-  if (field.type === 'employee' || field.type === 'select') return optionLabel(field, value);
+  if (field.type === 'employee' || field.type === 'select')
+    return optionLabel(field, value);
   return fmt(value, field.type);
 }
 
@@ -659,7 +835,9 @@ function buttonTreeOptions() {
 function fieldRules(field: any): FormItemRule[] | undefined {
   if (
     !field.required ||
-    (moduleName.value === 'employees' && editingId.value && field.field === 'password')
+    (moduleName.value === 'employees' &&
+      editingId.value &&
+      field.field === 'password')
   ) {
     return undefined;
   }
@@ -706,7 +884,9 @@ const schoolGradeCascaderProps = { emitPath: true };
 
 const schoolScopeOptions = computed(() =>
   dicts.schools.map((school) => {
-    const gradeCodes = Array.isArray(school.gradeCodes) ? school.gradeCodes : [];
+    const gradeCodes = Array.isArray(school.gradeCodes)
+      ? school.gradeCodes
+      : [];
 
     return {
       children: dicts.grades
@@ -755,28 +935,37 @@ async function loadAuxData() {
   if (result.menus) dicts.menus = result.menus || [];
 }
 
+function listParams() {
+  if (moduleName.value === 'menus') {
+    return { ...query, page: 1, pageSize: 100 };
+  }
+  if (moduleName.value === 'call-records') {
+    return {
+      ...query,
+      callAtEnd: query.callAtRange?.[1],
+      callAtRange: undefined,
+      callAtStart: query.callAtRange?.[0],
+    };
+  }
+  if (moduleName.value === 'risk-logs') {
+    return {
+      ...query,
+      createdAtEnd: query.riskAtRange?.[1],
+      createdAtStart: query.riskAtRange?.[0],
+      riskAtRange: undefined,
+    };
+  }
+  return query;
+}
+
 async function loadData() {
   loading.value = true;
   try {
-    const result = await listApi(
-      moduleName.value,
-      moduleName.value === 'menus'
-        ? {
-            ...query,
-            page: 1,
-            pageSize: 100,
-          }
-        : moduleName.value === 'call-records'
-          ? {
-              ...query,
-              callAtRange: undefined,
-              callAtEnd: query.callAtRange?.[1],
-              callAtStart: query.callAtRange?.[0],
-            }
-          : query,
-    );
+    const result = await listApi(moduleName.value, listParams());
     rows.value =
-      moduleName.value === 'menus' ? buildMenuTree(result.items || []) : result.items || [];
+      moduleName.value === 'menus'
+        ? buildMenuTree(result.items || [])
+        : result.items || [];
     total.value = result.total || 0;
   } catch (error) {
     if (handleCustomerScopeForbidden(error)) {
@@ -823,7 +1012,9 @@ async function resetForm(row?: Record<string, any>) {
     const value = data?.[field.field];
     if (field.type === 'schoolGrade') {
       form[field.field] =
-        data?.schoolId && data?.gradeCode ? [Number(data.schoolId), Number(data.gradeCode)] : [];
+        data?.schoolId && data?.gradeCode
+          ? [Number(data.schoolId), Number(data.gradeCode)]
+          : [];
       continue;
     }
     if (field.type === 'switch') {
@@ -835,7 +1026,9 @@ async function resetForm(row?: Record<string, any>) {
       continue;
     }
     form[field.field] =
-      value ?? field.defaultValue ?? (field.multiple || field.type === 'scopes' ? [] : undefined);
+      value ??
+      field.defaultValue ??
+      (field.multiple || field.type === 'scopes' ? [] : undefined);
   }
   if (moduleName.value === 'employees' && row) {
     form.password = undefined;
@@ -877,7 +1070,9 @@ async function openDetail(row: Record<string, any>) {
 
 function payload() {
   const data = Object.fromEntries(
-    Object.entries(form).filter(([, value]) => value !== '' && value !== undefined),
+    Object.entries(form).filter(
+      ([, value]) => value !== '' && value !== undefined,
+    ),
   );
   if (moduleName.value === 'customers' && Array.isArray(data.schoolGrade)) {
     const [schoolId, gradeCode] = data.schoolGrade;
@@ -888,10 +1083,18 @@ function payload() {
   if (moduleName.value === 'employees' && editingId.value && !data.password) {
     delete data.password;
   }
-  if (moduleName.value === 'teams' && editingId.value && !teamScopesTouched.value) {
+  if (
+    moduleName.value === 'teams' &&
+    editingId.value &&
+    !teamScopesTouched.value
+  ) {
     delete data.scopes;
   }
-  if (moduleName.value === 'menus' && editingId.value && form.parentId === undefined) {
+  if (
+    moduleName.value === 'menus' &&
+    editingId.value &&
+    form.parentId === undefined
+  ) {
     data.parentId = null;
   }
   if (
@@ -945,9 +1148,13 @@ async function batchRemove() {
     ElMessage.warning('请先勾选数据');
     return;
   }
-  await ElMessageBox.confirm(`确认删除选中的${selectedIds.value.length}条数据？`, '提示', {
-    type: 'warning',
-  });
+  await ElMessageBox.confirm(
+    `确认删除选中的${selectedIds.value.length}条数据？`,
+    '提示',
+    {
+      type: 'warning',
+    },
+  );
   await batchDeleteApi(moduleName.value, selectedIds.value);
   ElMessage.success(`已删除${selectedIds.value.length}条`);
   selectedRows.value = [];
@@ -955,7 +1162,10 @@ async function batchRemove() {
 }
 
 function openBatchAssign() {
-  if (selectedRows.value.length && !selectedAssignableCustomerIds.value.length) {
+  if (
+    selectedRows.value.length &&
+    !selectedAssignableCustomerIds.value.length
+  ) {
     ElMessage.warning('已勾选客户中没有待分配客户');
   }
   batchAssignVisible.value = true;
@@ -1023,7 +1233,11 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Page :title="config.title" auto-content-height content-class="crm-list-content">
+  <Page
+    :title="config.title"
+    auto-content-height
+    content-class="crm-list-content"
+  >
     <ElCard class="crm-search-card">
       <div class="flex flex-wrap items-center gap-3">
         <ElInput
@@ -1122,6 +1336,55 @@ onMounted(async () => {
           />
         </ElSelect>
         <ElSelect
+          v-if="config.filters.includes('employeeId')"
+          v-model="query.employeeId"
+          clearable
+          filterable
+          placeholder="操作员工"
+          style="width: 160px"
+        >
+          <ElOption
+            v-for="item in selectOptions({ type: 'employee' })"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </ElSelect>
+        <ElSelect
+          v-if="config.filters.includes('requestedStatus')"
+          v-model="query.requestedStatus"
+          clearable
+          placeholder="请求状态"
+          style="width: 140px"
+        >
+          <ElOption label="已成交" :value="3" />
+          <ElOption label="无效" :value="4" />
+        </ElSelect>
+        <ElSelect
+          v-if="config.filters.includes('ruleCode')"
+          v-model="query.ruleCode"
+          clearable
+          placeholder="风险规则"
+          style="width: 210px"
+        >
+          <ElOption
+            v-for="item in riskRuleOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </ElSelect>
+        <ElDatePicker
+          v-if="config.filters.includes('riskAtRange')"
+          v-model="query.riskAtRange"
+          end-placeholder="结束时间"
+          range-separator="至"
+          start-placeholder="开始时间"
+          style="width: 340px"
+          type="datetimerange"
+          value-format="YYYY-MM-DD HH:mm:ss"
+        />
+        <ElSelect
           v-if="config.filters.includes('callEmployeeId')"
           v-model="query.callEmployeeId"
           clearable
@@ -1193,14 +1456,25 @@ onMounted(async () => {
           </ElButton>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <ElButton v-if="!readOnly && hasButton('create')" @click="openDialog()"> 新增 </ElButton>
           <ElButton
-            v-if="!readOnly && moduleName === 'customers' && hasButton('import')"
+            v-if="!readOnly && hasButton('create')"
+            @click="openDialog()"
+          >
+            新增
+          </ElButton>
+          <ElButton
+            v-if="
+              !readOnly && moduleName === 'customers' && hasButton('import')
+            "
             @click="openImport"
           >
             导入
           </ElButton>
-          <ElButton v-if="canBatchAssign" type="primary" @click="openBatchAssign">
+          <ElButton
+            v-if="canBatchAssign"
+            type="primary"
+            @click="openBatchAssign"
+          >
             批量分配
           </ElButton>
         </div>
@@ -1224,14 +1498,21 @@ onMounted(async () => {
         >
           <template #default="{ row }">
             <ElButton
-              v-if="column.field === config.detailField && row[column.field] && hasButton('detail')"
+              v-if="
+                column.field === config.detailField &&
+                row[column.field] &&
+                hasButton('detail')
+              "
               link
               type="primary"
               @click="openDetail(row)"
             >
               {{ fmt(row[column.field], column.type) }}
             </ElButton>
-            <div v-else-if="column.type === 'tags'" class="flex flex-wrap gap-1">
+            <div
+              v-else-if="column.type === 'tags'"
+              class="flex flex-wrap gap-1"
+            >
               <ElTag
                 v-for="item in row[column.field] || []"
                 :key="item.id || item.realName"
@@ -1248,18 +1529,35 @@ onMounted(async () => {
             >
               查看
             </a>
-            <div v-else-if="column.type === 'audio' && row[column.field]" class="crm-audio-cell">
-              <ElButton link type="primary" @click="openAudio(row[column.field])"> 查看 </ElButton>
+            <div
+              v-else-if="column.type === 'audio' && row[column.field]"
+              class="crm-audio-cell"
+            >
+              <ElButton
+                link
+                type="primary"
+                @click="openAudio(row[column.field])"
+              >
+                查看
+              </ElButton>
             </div>
             <span v-else>{{ tableText(column, row) }}</span>
           </template>
         </ElTableColumn>
         <ElTableColumn v-if="canOperate" fixed="right" label="操作" width="150">
           <template #default="{ row }">
-            <ElButton v-if="hasButton('update')" link type="primary" @click="openDialog(row)"
+            <ElButton
+              v-if="hasButton('update')"
+              link
+              type="primary"
+              @click="openDialog(row)"
               >编辑</ElButton
             >
-            <ElButton v-if="hasButton('delete')" link type="danger" @click="remove(row)"
+            <ElButton
+              v-if="hasButton('delete')"
+              link
+              type="danger"
+              @click="remove(row)"
               >删除</ElButton
             >
           </template>
@@ -1286,7 +1584,13 @@ onMounted(async () => {
       :title="drawerTitle"
     >
       <div v-if="formLoading" v-loading="true" style="min-height: 240px"></div>
-      <ElForm v-else ref="formRef" v-loading="formSaving" :model="form" label-width="136px">
+      <ElForm
+        v-else
+        ref="formRef"
+        v-loading="formSaving"
+        :model="form"
+        label-width="136px"
+      >
         <ElFormItem
           v-for="field in drawerFields"
           :key="field.field"
@@ -1323,7 +1627,9 @@ onMounted(async () => {
             check-strictly
             clearable
             collapse-tags
-            :data="menuTreeOptions(moduleName === 'menus' ? editingId : undefined)"
+            :data="
+              menuTreeOptions(moduleName === 'menus' ? editingId : undefined)
+            "
             filterable
             :multiple="field.multiple"
             node-key="value"
@@ -1353,7 +1659,10 @@ onMounted(async () => {
               :value="item.value"
             />
           </ElSelect>
-          <ElRadioGroup v-else-if="field.type === 'radio'" v-model="form[field.field]">
+          <ElRadioGroup
+            v-else-if="field.type === 'radio'"
+            v-model="form[field.field]"
+          >
             <ElRadioButton
               v-for="item in selectOptions(field)"
               :key="item.value"
@@ -1439,7 +1748,12 @@ onMounted(async () => {
       </template>
     </ElDrawer>
 
-    <ElDialog v-model="audioVisible" title="通话录音" width="520px" @closed="audioUrl = ''">
+    <ElDialog
+      v-model="audioVisible"
+      title="通话录音"
+      width="520px"
+      @closed="audioUrl = ''"
+    >
       <audio
         v-if="audioUrl"
         class="crm-audio-player"
@@ -1460,7 +1774,12 @@ onMounted(async () => {
       @success="handleBatchAssignSuccess"
     />
 
-    <ElDialog v-if="!readOnly" v-model="importVisible" title="导入客户" width="520px">
+    <ElDialog
+      v-if="!readOnly"
+      v-model="importVisible"
+      title="导入客户"
+      width="520px"
+    >
       <ElForm :model="importForm" label-width="90px">
         <ElFormItem label="学校年级" required>
           <ElCascader
@@ -1494,8 +1813,12 @@ onMounted(async () => {
         </ElFormItem>
         <ElFormItem label="选项">
           <div class="flex flex-col gap-2">
-            <ElCheckbox v-model="importForm.autoDeduplicatePhone"> 自动去重手机号 </ElCheckbox>
-            <ElCheckbox v-model="importForm.autoValidatePhone"> 自动校验手机号有效性 </ElCheckbox>
+            <ElCheckbox v-model="importForm.autoDeduplicatePhone">
+              自动去重手机号
+            </ElCheckbox>
+            <ElCheckbox v-model="importForm.autoValidatePhone">
+              自动校验手机号有效性
+            </ElCheckbox>
           </div>
         </ElFormItem>
       </ElForm>

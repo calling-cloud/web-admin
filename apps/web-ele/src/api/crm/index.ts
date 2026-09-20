@@ -5,6 +5,7 @@ export type CrmModule =
   | 'customers'
   | 'employees'
   | 'menus'
+  | 'risk-logs'
   | 'roles'
   | 'schools'
   | 'teams';
@@ -21,7 +22,10 @@ export interface PageParams {
   callAtStart?: string;
   callEmployeeId?: number;
   callTeamId?: number;
+  createdAtEnd?: string;
+  createdAtStart?: string;
   customerId?: number;
+  employeeId?: number;
   exclusiveEmployeeId?: number;
   exclusiveMode?: number;
   gradeCode?: number;
@@ -29,6 +33,8 @@ export interface PageParams {
   intentLevel?: number;
   page?: number;
   pageSize?: number;
+  requestedStatus?: number;
+  ruleCode?: string;
   schoolId?: number;
   status?: number;
   teamId?: number;
@@ -39,6 +45,45 @@ export interface PageResult<T = Record<string, any>> {
   page: number;
   pageSize: number;
   total: number;
+}
+
+export interface DialPoolFilters {
+  customerName?: string;
+  gradeCode?: number;
+  phone?: string;
+  schoolId?: number;
+  status?: number;
+  statusUpdatedAtEnd?: string;
+  statusUpdatedAtStart?: string;
+  statusUpdatedByEmployeeId?: number;
+  teamId?: number;
+}
+
+export interface DialPoolCustomer {
+  assignedTeamId?: null | number;
+  customerName: string;
+  gradeCode: number;
+  gradeName: string;
+  id: number;
+  phone: string;
+  schoolId: number;
+  schoolName: string;
+  status: number;
+  statusUpdatedAt?: null | string;
+  statusUpdatedByEmployeeId?: null | number;
+  statusUpdatedByEmployeeName?: null | string;
+  teamName?: null | string;
+}
+
+export interface DialPoolOperation {
+  changedCount: number;
+  failureMessage: string;
+  id: string;
+  processedCount: number;
+  skippedCount: number;
+  status: 1 | 2 | 3 | 4;
+  targetStatus: number;
+  totalCount: number;
 }
 
 export interface DictItem {
@@ -88,11 +133,31 @@ export interface SettingsInput {
   dealNotifyEnabled?: boolean;
   dingtalkPushEnabled?: boolean;
   dingtalkWebhookUrl?: string;
+  invalidPersonalHistoryDays?: number;
+  invalidPersonalMinHistoryHandled?: number;
+  invalidPersonalMinRateDiffPercent?: number;
+  invalidPersonalMinTodayHandled?: number;
+  invalidPersonalRateMultiplierPercent?: number;
+  invalidPersonalRiskEnabled?: boolean;
+  invalidTeamMinHandled?: number;
+  invalidTeamMinRateDiffPercent?: number;
+  invalidTeamMinTodayHandled?: number;
+  invalidTeamRateMultiplierPercent?: number;
+  invalidTeamRiskEnabled?: boolean;
   loginCaptchaEnabled?: boolean;
   maxAssignCount?: number;
   repeatAssignContactedOnly?: boolean;
   repeatAssignIntervalHours?: number;
   repeatAssignMinIntentLevel?: number;
+  statusRiskBurstCount?: number;
+  statusRiskBurstAutoRestoreEnabled?: boolean;
+  statusRiskBurstEnabled?: boolean;
+  statusRiskBurstWindowMinutes?: number;
+  statusRiskCallWithinHours?: number;
+  statusRiskEnabled?: boolean;
+  statusRiskAction?: 1 | 2;
+  statusRiskMinCallSeconds?: number;
+  statusRiskRequireCallEnabled?: boolean;
   wecomPushEnabled?: boolean;
   wecomWebhookUrl?: string;
 }
@@ -163,6 +228,55 @@ export function batchAssignCustomersApi(data: BatchAssignCustomersInput) {
     '/customers/batch/assign',
     data,
   );
+}
+
+export function listDialPoolCustomersApi(
+  params: DialPoolFilters & { page?: number; pageSize?: number },
+) {
+  return requestClient.get<PageResult<DialPoolCustomer>>(
+    '/dial-pool/customers',
+    { params },
+  );
+}
+
+export function updateDialPoolCustomerStatusApi(id: number, status: number) {
+  return requestClient.put<{ affected: number; skipped: number }>(
+    `/dial-pool/customers/${id}/status`,
+    { status },
+  );
+}
+
+export function batchUpdateDialPoolCustomerStatusApi(
+  customerIds: number[],
+  status: number,
+) {
+  return requestClient.post<{ affected: number; skipped: number }>(
+    '/dial-pool/customers/batch/status',
+    { customerIds, status },
+  );
+}
+
+export function previewDialPoolFilterStatusApi(filters: DialPoolFilters) {
+  return requestClient.post<{ total: number }>(
+    '/dial-pool/customers/filter-status/preview',
+    { filters },
+  );
+}
+
+export function updateDialPoolFilterStatusApi(data: {
+  expectedCount: number;
+  filters: DialPoolFilters;
+  password: string;
+  status: number;
+}) {
+  return requestClient.post<DialPoolOperation>(
+    '/dial-pool/customers/filter-status',
+    data,
+  );
+}
+
+export function getDialPoolOperationApi(id: string) {
+  return requestClient.get<DialPoolOperation>(`/dial-pool/operations/${id}`);
 }
 
 export function importCustomersApi(data: FormData) {
