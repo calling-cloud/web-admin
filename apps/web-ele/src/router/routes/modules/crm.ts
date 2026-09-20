@@ -21,6 +21,15 @@ const routes: RouteRecordRaw[] = [
         path: 'customers',
       },
       {
+        component: () => import('#/views/crm/dial-pool/index.vue'),
+        meta: {
+          icon: 'lucide:list-checks',
+          title: '拨号池管理',
+        },
+        name: 'CrmDialPool',
+        path: 'dial-pool',
+      },
+      {
         component: () => import('#/views/crm/list/index.vue'),
         meta: {
           crmModule: 'call-records',
@@ -29,6 +38,16 @@ const routes: RouteRecordRaw[] = [
         },
         name: 'CrmCallRecords',
         path: 'call-records',
+      },
+      {
+        component: () => import('#/views/crm/list/index.vue'),
+        meta: {
+          crmModule: 'risk-logs',
+          icon: 'lucide:shield-alert',
+          title: '风险日志',
+        },
+        name: 'CrmRiskLogs',
+        path: 'risk-logs',
       },
       {
         component: () => import('#/views/crm/list/index.vue'),
