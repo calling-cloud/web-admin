@@ -126,6 +126,16 @@ const riskRuleOptions = [
   { label: '高于团队平均无效率', value: 'INVALID_TEAM_BASELINE' },
 ];
 type SchoolGradeValue = [number, number];
+const keywordPlaceholders: Record<CrmModule, string> = {
+  'call-records': '客户姓名/手机号/备注/员工/团队',
+  'risk-logs': '客户姓名/手机号/员工/团队/规则编码',
+  customers: '客户姓名或手机号',
+  employees: '员工姓名/用户名/手机号',
+  menus: '菜单标题',
+  roles: '角色名称',
+  schools: '学校名称',
+  teams: '团队名称',
+};
 const configs: Record<CrmModule, any> = {
   'call-records': {
     detailField: 'customerName',
@@ -1243,8 +1253,8 @@ onMounted(async () => {
         <ElInput
           v-model="query.keyword"
           clearable
-          placeholder="关键字"
-          style="width: 220px"
+          :placeholder="keywordPlaceholders[moduleName]"
+          style="width: 300px"
           @keyup.enter="loadData"
         />
         <ElSelect

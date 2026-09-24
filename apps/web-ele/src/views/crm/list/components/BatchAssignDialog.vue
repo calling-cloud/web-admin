@@ -424,7 +424,7 @@ watch(
           <ElInput
             v-model="pendingQuery.keyword"
             clearable
-            placeholder="关键字"
+            placeholder="客户姓名或手机号"
             style="width: 220px"
             @keyup.enter="searchPendingCustomers"
           />
